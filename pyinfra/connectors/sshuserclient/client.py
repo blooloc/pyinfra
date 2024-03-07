@@ -171,13 +171,14 @@ class SSHClient(ParamikoClient):
             session = transport.open_session()
             AgentRequestHandler(session)
 
-    def gateway(self, hostname, host_port, target, target_port):
+    def gateway(self, hostname, host_port, target, target_port, timeout):
         transport = self.get_transport()
         assert transport is not None, "No transport"
         return transport.open_channel(
             "direct-tcpip",
             (target, target_port),
             (hostname, host_port),
+            timeout=timeout
         )
 
     def parse_config(
@@ -244,7 +245,10 @@ class SSHClient(ParamikoClient):
                 else:
                     target, target_config = self.derive_shorthand(ssh_config, hops[i + 1])
 
-                sock = c.gateway(hostname, cfg["port"], target, target_config["port"])
+                timeout = None
+                if "connecttimeout" in host_config:
+                    timeout = int(host_config["connecttimeout"])
+                sock = c.gateway(hostname, cfg["port"], target, target_config["port"], timeout=timeout)
             cfg["sock"] = sock
 
         return hostname, cfg, forward_agent, missing_host_key_policy, host_keys_file
