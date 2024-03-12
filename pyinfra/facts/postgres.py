@@ -56,6 +56,7 @@ class PostgresFactBase(FactBase):
         psql_password=None,
         psql_host=None,
         psql_port=None,
+        database=None
     ):
         return make_execute_psql_command(
             self.psql_command,
@@ -63,6 +64,7 @@ class PostgresFactBase(FactBase):
             password=psql_password,
             host=psql_host,
             port=psql_port,
+            database=database
         )
 
 
