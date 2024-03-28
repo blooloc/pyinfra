@@ -491,7 +491,7 @@ class SSHConnector(BaseConnector):
                     return False
 
             # Execute run_shell_command w/sudo, etc
-            command = StringCommand("cp", temp_file, QuoteString(remote_filename))
+            command = StringCommand("install", temp_file, QuoteString(remote_filename))
 
             status, output = self.run_shell_command(
                 command,
