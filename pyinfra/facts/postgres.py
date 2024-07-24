@@ -7,13 +7,13 @@ from .util.databases import parse_columns_and_rows
 
 
 def make_psql_command(
-    database=None,
-    user=None,
-    password=None,
-    host=None,
-    port=None,
+    database: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+    host: str | None = None,
+    port: str | int | None = None,
     executable="psql",
-):
+) -> StringCommand:
     target_bits: list[str] = []
 
     if password:
@@ -48,7 +48,9 @@ class PostgresFactBase(FactBase):
     abstract = True
 
     psql_command: str
-    requires_command = "psql"
+
+    def requires_command(self, *args, **kwargs):
+        return "psql"
 
     def command(
         self,

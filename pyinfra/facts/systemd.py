@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import re
 from typing import Dict, Iterable
 
-from pyinfra.api import FactBase, FactTypeError, QuoteString, StringCommand
+from pyinfra.api import FactBase, QuoteString, StringCommand
 
 # Valid unit names consist of a "name prefix" and a dot and a suffix specifying the unit type.
 # The "unit prefix" must consist of one or more valid characters
@@ -50,14 +52,21 @@ class SystemdStatus(FactBase[Dict[str, bool]]):
         }
     """
 
-    requires_command = "systemctl"
+    def requires_command(self, *args, **kwargs) -> str:
+        return "systemctl"
 
     default = dict
 
     state_key = "SubState"
     state_values = ["running", "waiting", "exited"]
 
-    def command(self, user_mode=False, machine=None, user_name=None, services=None):
+    def command(
+        self,
+        user_mode: bool = False,
+        machine: str | None = None,
+        user_name: str | None = None,
+        services: str | list[str] | None = None,
+    ) -> StringCommand:
         fact_cmd = _make_systemctl_cmd(
             user_mode=user_mode,
             machine=machine,
@@ -70,8 +79,6 @@ class SystemdStatus(FactBase[Dict[str, bool]]):
             service_strs = [QuoteString(services)]
         elif isinstance(services, Iterable):
             service_strs = [QuoteString(s) for s in services]
-        else:
-            raise FactTypeError(f"Invalid type passed for services argument: {type(services)}")
 
         return StringCommand(
             fact_cmd,

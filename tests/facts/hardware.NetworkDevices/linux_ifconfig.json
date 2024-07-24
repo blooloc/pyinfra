@@ -30,7 +30,7 @@
     ],
     "fact": {
         "enp1s0": {
-            "ether": "2a01:e0a:5c2:7450",
+            "ether": "b0:41:6f:0a:cf:22",
             "mtu": 1500,
             "state": "UP",
             "ipv4": {
@@ -51,7 +51,7 @@
             }
         },
         "incusbr0": {
-            "ether": "fe80::216:3eff:fe",
+            "ether": "00:16:3e:9c:82:00",
             "mtu": 1500,
             "state": "UP",
             "ipv4": {
@@ -74,6 +74,12 @@
         "lo": {
             "mtu": 65536,
             "state": "UP",
+            "ipv4": {
+                "address": "127.0.0.1",
+                "mask_bits": 8,
+                "netmask": "255.0.0.0",
+                "broadcast": null
+            },
             "ipv6": {
                 "address": "::1",
                 "mask_bits": 128

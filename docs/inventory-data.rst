@@ -1,9 +1,9 @@
 Inventory & Data
 ================
 
-A pyinfra inventory provides hosts, groups and data. Host are the things pyinfra will make changes to (think a SSH daemon on a server, a Docker container or the local machine). Hosts can be attached to groups, and data can then be assigned to both the groups and individual hosts.
+A pyinfra inventory provides hosts, groups and data. Hosts are the things pyinfra will make changes to (think a SSH daemon on a server, a Docker container or the local machine). Hosts can be attached to groups, and data can then be assigned to both the groups and individual hosts.
 
-By default pyinfra assumes hosts are SSH servers and the name of the host is used as the SSH hostname. Prefixing the name of the host with ``@<connector-name>/`` is used to activate alternative connectors. See: :doc:`connectors`.
+By default, pyinfra assumes hosts are SSH servers and the name of the host is used as the SSH hostname. Prefixing the name of the host with ``@<connector-name>/`` is used to activate alternative connectors. See: :doc:`connectors`.
 
 Inventory Files
 ---------------
@@ -63,7 +63,7 @@ Data can be assigned to individual hosts in the inventory by using a tuple ``(ho
         ("db-1.net", {"install_postgres": True}),
     ]
 
-This can then be used in operations files:
+This data can then be used in operations:
 
 .. code:: python
 
@@ -84,7 +84,7 @@ Group data can be stored in separate files under the ``group_data`` directory (t
     app_user = "myuser"
     app_dir = "/opt/pyinfra"
 
-These can then be used in operations:
+These variables can then be used in operations:
 
 .. code:: python
 
@@ -115,7 +115,7 @@ The same keys can be defined for host and group data - this means we can set a d
 Connecting with Data
 --------------------
 
-Data can be used to configure connectors, for example setting SSH connection details can be done like so:
+Data can be used to configure connectors. For example, setting SSH connection details can be done like so:
 
 .. code:: python
 

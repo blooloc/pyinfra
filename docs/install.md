@@ -1,6 +1,6 @@
 # Installation
 
-## Pipx
+## Pip
 
 It is recommended to install pyinfra using `pip`:
 

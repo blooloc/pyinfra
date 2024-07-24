@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pyinfra.api import FactBase
 
 from .util.packaging import parse_packages
@@ -16,8 +18,11 @@ class GemPackages(FactBase):
         }
     """
 
-    command = "gem list --local"
-    requires_command = "gem"
+    def command(self) -> str:
+        return "gem list --local"
+
+    def requires_command(self) -> str:
+        return "gem"
 
     default = dict
 

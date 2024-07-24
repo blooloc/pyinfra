@@ -2,6 +2,8 @@
 Manage snap packages. See https://snapcraft.io/
 """
 
+from __future__ import annotations
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.facts.snap import SnapPackage, SnapPackages
@@ -9,7 +11,7 @@ from pyinfra.facts.snap import SnapPackage, SnapPackages
 
 @operation()
 def package(
-    packages=None,
+    packages: str | list[str] | None = None,
     channel="latest/stable",
     classic=False,
     present=True,

@@ -2,22 +2,25 @@
 The LXD modules manage LXD containers
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.facts.lxd import LxdContainers
 
 
-def get_container_named(name, containers):
+def get_container_named(name: str, containers: list[dict[str, Any]]) -> dict[str, Any] | None:
     for container in containers:
         if container["name"] == name:
             return container
-    else:
-        return None
+    return None
 
 
 @operation()
 def container(
-    id,
+    id: str,
     present=True,
     image="ubuntu:16.04",
 ):

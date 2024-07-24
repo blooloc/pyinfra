@@ -75,7 +75,7 @@ class TestVagrantConnector(TestCase):
             (
                 "@vagrant/ubuntu16",
                 {
-                    "ssh_port": "2222",
+                    "ssh_port": 2222,
                     "ssh_user": "vagrant",
                     "ssh_hostname": "127.0.0.1",
                     "ssh_key": "path/to/key",
@@ -85,7 +85,7 @@ class TestVagrantConnector(TestCase):
             (
                 "@vagrant/centos7",
                 {
-                    "ssh_port": "2200",
+                    "ssh_port": 2200,
                     "ssh_user": "vagrant",
                     "ssh_hostname": "127.0.0.1",
                     "ssh_key": "path/to/key",
@@ -109,7 +109,7 @@ class TestVagrantConnector(TestCase):
             (
                 "@vagrant/ubuntu16",
                 {
-                    "ssh_port": "2222",
+                    "ssh_port": 2222,
                     "ssh_user": "vagrant",
                     "ssh_hostname": "127.0.0.1",
                     "ssh_key": "path/to/key",

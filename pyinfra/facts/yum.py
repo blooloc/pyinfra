@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pyinfra.api import FactBase
 
 from .util import make_cat_files_command
@@ -21,11 +23,14 @@ class YumRepositories(FactBase):
         ]
     """
 
-    command = make_cat_files_command(
-        "/etc/yum.conf",
-        "/etc/yum.repos.d/*.repo",
-    )
-    requires_command = "yum"
+    def command(self) -> str:
+        return make_cat_files_command(
+            "/etc/yum.conf",
+            "/etc/yum.repos.d/*.repo",
+        )
+
+    def requires_command(self) -> str:
+        return "yum"
 
     default = list
 

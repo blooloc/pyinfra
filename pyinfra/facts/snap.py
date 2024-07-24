@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from pyinfra.api import FactBase
@@ -5,7 +7,9 @@ from pyinfra.api import FactBase
 
 class SnapBaseFact(FactBase):
     abstract = True
-    requires_command = "snap"
+
+    def requires_command(self, *args, **kwargs) -> str:
+        return "snap"
 
 
 class SnapPackage(SnapBaseFact):
@@ -62,7 +66,9 @@ class SnapPackages(SnapBaseFact):
     """
 
     default = list
-    command = "snap list"
+
+    def command(self) -> str:
+        return "snap list"
 
     def process(self, output):
         # Discard header output line from snap list command

@@ -13,6 +13,7 @@
 700
 8
 9
+DCCP
 FakePathLike
 IRGRP
 IROTH
@@ -28,6 +29,7 @@ IXOTH
 IXUSR
 Launchd
 Openvz
+SCTP
 TMPDIR
 UNIXCONFDIR
 abstractmethod
@@ -53,6 +55,7 @@ automagically
 automount
 autoname
 autosectionlabel
+autostart
 autouse
 awk
 backport
@@ -127,6 +130,7 @@ e501
 ed25519
 endian
 entrypoint
+envs
 envvar
 epel
 excuted
@@ -150,6 +154,7 @@ fstab
 fullmatch
 gaierror
 generic
+getaddrinfo
 getargspec
 getcallargs
 getdoc
@@ -171,6 +176,7 @@ greenlets
 groupname
 hacky
 hashability
+hbutils
 hklm
 homedir
 homepath
@@ -188,6 +194,7 @@ initd
 initrd
 intstatus
 ip6tables
+ipam
 ipdb
 iproute2
 iptables
@@ -226,6 +233,7 @@ logonsession
 lsb
 lxd
 macos
+maxsplit
 md5sum
 mech
 memoize
@@ -300,19 +308,24 @@ readlink
 rebase
 recv
 redbaron
+redef
 release
 remote
 remoteforward
 repo
 repos
+reqs
 rfind
 rlimit
 rol
 rsa
 rst
 rsync
+runit
 runlevel
 runlevels
+runsv
+runsvdir
 s01
 s1
 samefile
@@ -337,10 +350,12 @@ simplefilter
 skipif
 socketserver
 somehost
+sourcedir
 sshkeys
 sshuserclient
 ssl
 status
+statusstr
 stdlib
 stringify
 stringio
@@ -350,9 +365,11 @@ subclassed
 subclassing
 subkey
 submodules
+subnet
 sudo
 sudo'd
 sudoing
+svdir
 switcheroo
 sysctl
 sysctls
@@ -384,6 +401,7 @@ uefi
 ufw
 uname
 unignored
+unmanaged
 unmount
 unresposivehost
 up

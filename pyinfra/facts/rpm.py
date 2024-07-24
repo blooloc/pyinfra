@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import re
+import shlex
 
 from pyinfra.api import FactBase
 
@@ -19,8 +22,11 @@ class RpmPackages(FactBase):
         }
     """
 
-    command = 'rpm --queryformat "{0}" -qa'.format(rpm_query_format)
-    requires_command = "rpm"
+    def command(self) -> str:
+        return "rpm --queryformat {0} -qa".format(shlex.quote(rpm_query_format))
+
+    def requires_command(self) -> str:
+        return "rpm"
 
     default = dict
 
@@ -40,14 +46,15 @@ class RpmPackage(FactBase):
         }
     """
 
-    requires_command = "rpm"
+    def requires_command(self, package) -> str:
+        return "rpm"
 
-    def command(self, name):
+    def command(self, package) -> str:
         return (
-            'rpm --queryformat "{0}" -q {1} || '
+            "rpm --queryformat {0} -q {1} || "
             "! test -e {1} || "
-            'rpm --queryformat "{0}" -qp {1} 2> /dev/null'
-        ).format(rpm_query_format, name)
+            "rpm --queryformat {0} -qp {1} 2> /dev/null"
+        ).format(shlex.quote(rpm_query_format), shlex.quote(package))
 
     def process(self, output):
         for line in output:
@@ -66,18 +73,17 @@ class RpmPackageProvides(FactBase):
 
     default = list
 
-    requires_command = "repoquery"
+    def requires_command(self, *args, **kwargs) -> str:
+        return "repoquery"
 
-    @staticmethod
-    def command(name):
+    def command(self, package):
         # Accept failure here (|| true) for invalid/unknown packages
-        return 'repoquery --queryformat "{0}" --whatprovides {1} || true'.format(
-            rpm_query_format,
-            name,
+        return "repoquery --queryformat {0} --whatprovides {1} || true".format(
+            shlex.quote(rpm_query_format),
+            shlex.quote(package),
         )
 
-    @staticmethod
-    def process(output):
+    def process(self, output):
         packages = []
 
         for line in output:

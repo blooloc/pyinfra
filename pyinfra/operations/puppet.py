@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from pyinfra.api import operation
 
 
 @operation(is_idempotent=False)
-def agent(server=None, port=None):
+def agent(server: str | None = None, port: int | None = None):
     """
     Run puppet agent
 

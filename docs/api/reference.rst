@@ -3,11 +3,11 @@ API Reference
 
 The pyinfra API is designed to be used as follows:
 
-1. Create the state we are going to operate on, this consists of:
+1. Create the state we are going to operate on, which consists of:
     - An inventory ``pyinfra.api.Inventory`` containing hosts ``pyinfra.api.Host``, plus any data
     - A config ``pyinfra.api.Config`` for global flag
     - A state ``pyinfra.api.State`` that combines the inventory & config
-2. Now state is setup, we define operations:
+2. Now that state is setup, we define operations:
     - ``pyinfra.api.operation.add_op``
     - ``pyinfra.api.add_deploy``
 3. Now that's done, we execute it:

@@ -2,6 +2,8 @@
 Manage pacman packages. (Arch Linux package manager)
 """
 
+from __future__ import annotations
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.facts.pacman import PacmanPackages, PacmanUnpackGroup
@@ -35,7 +37,7 @@ _update = update._inner  # noqa: E305
 
 @operation()
 def packages(
-    packages=None,
+    packages: str | list[str] | None = None,
     present=True,
     update=False,
     upgrade=False,
@@ -75,8 +77,5 @@ def packages(
         present,
         install_command="pacman --noconfirm -S",
         uninstall_command="pacman --noconfirm -R",
-        expand_package_fact=lambda package: host.get_fact(
-            PacmanUnpackGroup,
-            name=package,
-        ),
+        expand_package_fact=lambda package: host.get_fact(PacmanUnpackGroup, package=package),
     )

@@ -1,19 +1,29 @@
+from __future__ import annotations
+
 import shlex
 from collections import defaultdict
 from io import StringIO
+from typing import Callable
 from urllib.parse import urlparse
 
+from pyinfra.api import Host, State
 from pyinfra.facts.files import File
 from pyinfra.facts.rpm import RpmPackage
+from pyinfra.operations import files
 
 
-def _package_name(package):
+def _package_name(package: list[str] | str) -> str:
     if isinstance(package, list):
         return package[0]
     return package
 
 
-def _has_package(package, packages, expand_package_fact=None, match_any=False):
+def _has_package(
+    package: str | list[str],
+    packages: dict[str, set[str]],
+    expand_package_fact: Callable[[str], list[str | list[str]]] | None = None,
+    match_any=False,
+) -> tuple[bool, dict]:
     def in_packages(pkg_name, pkg_versions):
         if not pkg_versions:
             return pkg_name in packages
@@ -21,9 +31,12 @@ def _has_package(package, packages, expand_package_fact=None, match_any=False):
             version in packages[pkg_name] for version in pkg_versions
         )
 
-    packages_to_check = [package]
+    packages_to_check: list[str | list[str]] = [package]
     if expand_package_fact:
-        packages_to_check = expand_package_fact(package) or packages_to_check
+        if isinstance(package, list):
+            packages_to_check = expand_package_fact(package[0]) or packages_to_check
+        else:
+            packages_to_check = expand_package_fact(package) or packages_to_check
 
     package_name_to_versions = defaultdict(set)
     for pkg in packages_to_check:
@@ -43,16 +56,16 @@ def _has_package(package, packages, expand_package_fact=None, match_any=False):
 
 
 def ensure_packages(
-    host,
-    packages,
-    current_packages,
-    present,
-    install_command,
-    uninstall_command,
+    host: Host,
+    packages_to_ensure: str | list[str] | None,
+    current_packages: dict[str, set[str]],
+    present: bool,
+    install_command: str,
+    uninstall_command: str,
     latest=False,
-    upgrade_command=None,
-    version_join=None,
-    expand_package_fact=None,
+    upgrade_command: str | None = None,
+    version_join: str | None = None,
+    expand_package_fact: Callable[[str], list[str | list[str]]] | None = None,
 ):
     """
     Handles this common scenario:
@@ -64,7 +77,7 @@ def ensure_packages(
     + Optionally upgrades packages w/o specified version when present
 
     Args:
-        packages (list): list of packages or package/versions
+        packages_to_ensure (list): list of packages or package/versions
         current_packages (fact): fact returning dict of package names -> version
         present (bool): whether packages should exist or not
         install_command (str): command to prefix to list of packages to install
@@ -73,18 +86,21 @@ def ensure_packages(
         upgrade_command (str): as above for upgrading
         version_join (str): the package manager specific "joiner", ie ``=`` for \
             ``<apt_pkg>=<version>``
+        expand_package_fact: fact returning packages providing a capability \
+            (ie ``yum whatprovides``)
     """
 
-    if packages is None:
+    if packages_to_ensure is None:
         return
+    if isinstance(packages_to_ensure, str):
+        packages_to_ensure = [packages_to_ensure]
 
-    if isinstance(packages, str):
-        packages = [packages]
+    packages: list[str | list[str]] = packages_to_ensure  # type: ignore[assignment]
 
     if version_join:
         packages = [
             package[0] if len(package) == 1 else package
-            for package in [package.rsplit(version_join, 1) for package in packages]
+            for package in [package.rsplit(version_join, 1) for package in packages]  # type: ignore[union-attr] # noqa
         ]
 
     diff_packages = []
@@ -140,7 +156,7 @@ def ensure_packages(
         command = install_command if present else uninstall_command
 
         joined_packages = [
-            version_join.join(package) if isinstance(package, list) else package
+            version_join.join(package) if isinstance(package, list) else package  # type: ignore[union-attr] # noqa
             for package in diff_packages
         ]
 
@@ -156,7 +172,7 @@ def ensure_packages(
         )
 
 
-def ensure_rpm(state, host, files, source, present, package_manager_command):
+def ensure_rpm(state: State, host: Host, source: str, present: bool, package_manager_command: str):
     original_source = source
 
     # If source is a url
@@ -165,18 +181,18 @@ def ensure_rpm(state, host, files, source, present, package_manager_command):
         temp_filename = "{0}.rpm".format(host.get_temp_filename(source))
 
         # Ensure it's downloaded
-        yield from files.download._inner(source, temp_filename)
+        yield from files.download._inner(src=source, dest=temp_filename)
 
         # Override the source with the downloaded file
         source = temp_filename
 
     # Check for file .rpm information
-    info = host.get_fact(RpmPackage, name=source)
+    info = host.get_fact(RpmPackage, package=source)
     exists = False
 
     # We have info!
     if info:
-        current_package = host.get_fact(RpmPackage, name=info["name"])
+        current_package = host.get_fact(RpmPackage, package=info["name"])
         if current_package and current_package["version"] == info["version"]:
             exists = True
 
@@ -204,18 +220,16 @@ def ensure_rpm(state, host, files, source, present, package_manager_command):
 
 
 def ensure_yum_repo(
-    state,
-    host,
-    files,
-    name_or_url,
-    baseurl,
-    present,
-    description,
-    enabled,
-    gpgcheck,
-    gpgkey,
+    host: Host,
+    name_or_url: str,
+    baseurl: str | None,
+    present: bool,
+    description: str | None,
+    enabled: bool,
+    gpgcheck: bool,
+    gpgkey: str | None,
     repo_directory="/etc/yum.repos.d/",
-    type_=None,
+    type_: str | None = None,
 ):
     url = None
     url_parts = urlparse(name_or_url)
@@ -229,14 +243,16 @@ def ensure_yum_repo(
 
     # If we don't want the repo, just remove any existing file
     if not present:
-        yield from files.file._inner(filename, present=False)
+        yield from files.file._inner(path=filename, present=False)
         return
 
     # If we're a URL, download the repo if it doesn't exist
     if url:
         if not host.get_fact(File, path=filename):
-            yield from files.download._inner(url, filename)
+            yield from files.download._inner(src=url, dest=filename)
         return
+
+    assert isinstance(baseurl, str)
 
     # Description defaults to name
     description = description or name_or_url
@@ -261,4 +277,4 @@ def ensure_yum_repo(
     repo_file = StringIO(repo)
 
     # Ensure this is the file on the server
-    yield from files.put._inner(repo_file, filename)
+    yield from files.put._inner(src=repo_file, dest=filename)

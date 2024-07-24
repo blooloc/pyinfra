@@ -1,4 +1,5 @@
 # encoding: utf8
+from __future__ import annotations
 
 from pyinfra.api import FactBase
 
@@ -20,7 +21,8 @@ class NpmPackages(FactBase):
 
     default = dict
 
-    requires_command = "npm"
+    def requires_command(self, directory=None) -> str:
+        return "npm"
 
     def command(self, directory=None):
         if directory:

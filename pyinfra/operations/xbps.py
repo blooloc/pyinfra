@@ -2,6 +2,8 @@
 Manage XBPS packages and repositories. Note that XBPS package names are case-sensitive.
 """
 
+from __future__ import annotations
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.facts.xbps import XbpsPackages
@@ -35,7 +37,7 @@ _update = update._inner  # noqa: E305
 
 @operation()
 def packages(
-    packages=None,
+    packages: str | list[str] | None = None,
     present=True,
     update=False,
     upgrade=False,

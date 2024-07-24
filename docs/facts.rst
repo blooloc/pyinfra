@@ -1,7 +1,7 @@
 Facts Index
 ===========
 
-pyinfra uses **facts** to determine the existing state of a remote server. Operations use this information to generate commands which alter the state. Facts are read-only and is populated at the beginning of the deploy.
+pyinfra uses **facts** to determine the existing state of a remote server. Operations use this information to generate commands which alter the state. Facts are read-only and are populated at the beginning of the deploy.
 
 Facts can be executed/tested via the command line:
 
@@ -23,7 +23,7 @@ Multiple facts with arguments may be called like so:
 
     pyinfra @local fact files.File path=setup.py files.File path=anotherfile.txt
 
-You can leverage facts as part of :doc:`within operations <using-operations>` like this:
+You can leverage facts within :doc:`operations <using-operations>` like this:
 
 .. code:: py
 

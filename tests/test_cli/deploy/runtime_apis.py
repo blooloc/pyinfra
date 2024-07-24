@@ -7,9 +7,9 @@ TEST_LINE = "test line"
 
 
 # Facts
-# Facts are gathered during the operation run which happens after the deploy
-# code is completely executed, so facts altered by operations will have the
-# state prior to any operations.
+# Facts are gathered during operation execution which happens after all the
+# deploy code is evaluated. This means any facts modified by previous operations
+# will not be up to date.
 
 files.line(
     path=TEST_FILENAME,
@@ -52,9 +52,8 @@ python.call(function=check_host_roles)
 
 
 # Operation changes
-# Operations are run after deploy code are completely executed, so operations
-# that overlap making changes to the remote system will both report they will
-# make changes.
+# Operations are run after all the deploy code is evaluated, so operations with
+# overlapping changes to the remote system will both report they will make changes.
 
 # For demonstration we just duplicate the first line op so it's always no change
 second_line_op = files.line(

@@ -237,17 +237,21 @@ def print_meta(state: "State"):
                 logger.info,
                 [
                     pretty_op_name(state.op_meta[op_hash]),
-                    "-"
-                    if len(hosts_in_op) == 0
-                    else "{0} ({1})".format(
-                        len(hosts_in_op),
-                        truncate(", ".join(sorted(hosts_in_op)), 48),
+                    (
+                        "-"
+                        if len(hosts_in_op) == 0
+                        else "{0} ({1})".format(
+                            len(hosts_in_op),
+                            truncate(", ".join(sorted(hosts_in_op)), 48),
+                        )
                     ),
-                    "-"
-                    if len(hosts_maybe_in_op) == 0
-                    else "{0} ({1})".format(
-                        len(hosts_maybe_in_op),
-                        truncate(", ".join(sorted(hosts_maybe_in_op)), 48),
+                    (
+                        "-"
+                        if len(hosts_maybe_in_op) == 0
+                        else "{0} ({1})".format(
+                            len(hosts_maybe_in_op),
+                            truncate(", ".join(sorted(hosts_maybe_in_op)), 48),
+                        )
                     ),
                 ],
             )
@@ -265,23 +269,21 @@ def print_results(state: "State"):
         hosts_in_op = 0
         hosts_in_op_success: list[str] = []
         hosts_in_op_error: list[str] = []
-        hosts_in_op_no_attempt: list[str] = []
+        hosts_in_op_no_change: list[str] = []
         for host in state.inventory.iter_activated_hosts():
             if op_hash not in state.ops[host]:
                 continue
 
             hosts_in_op += 1
 
-            result = state.ops[host][op_hash].operation_meta.did_succeed()
-            if result is True:
-                hosts_in_op_success.append(host.name)
-            elif result is False:
-                hosts_in_op_error.append(host.name)
+            op_meta = state.ops[host][op_hash].operation_meta
+            if op_meta.did_succeed(_raise_if_not_complete=False):
+                if op_meta._did_change():
+                    hosts_in_op_success.append(host.name)
+                else:
+                    hosts_in_op_no_change.append(host.name)
             else:
-                hosts_in_op_no_attempt.append(host.name)
-
-        # if not hosts_in_op:
-        #     continue
+                hosts_in_op_error.append(host.name)
 
         row = [
             pretty_op_name(state.op_meta[op_hash]),
@@ -296,95 +298,11 @@ def print_results(state: "State"):
             row.append(f"{len(hosts_in_op_error)}")
         else:
             row.append("-")
-        if hosts_in_op_no_attempt:
-            row.append(f"{len(hosts_in_op_no_attempt)}")
+        if hosts_in_op_no_change:
+            row.append(f"{len(hosts_in_op_no_change)}")
         else:
             row.append("-")
 
         rows.append((logger.info, row))
-
-    print_rows(rows)
-
-
-def get_fucked(state: "State"):
-    group_combinations = _get_group_combinations(state.inventory.iter_activated_hosts())
-    rows: List[Tuple[Callable, Union[List[str], str]]] = []
-
-    for i, (groups, hosts) in enumerate(group_combinations.items(), 1):
-        if not hosts:
-            continue
-
-        if groups:
-            rows.append(
-                (
-                    logger.info,
-                    "Groups: {0}".format(
-                        click.style(" / ".join(groups), bold=True),
-                    ),
-                ),
-            )
-        else:
-            rows.append((logger.info, "Ungrouped:"))
-
-        for host in hosts:
-            # Didn't connect to this host?
-            if host not in state.activated_hosts:
-                rows.append(
-                    (
-                        logger.info,
-                        [
-                            host.style_print_prefix("red", bold=True),
-                            click.style("No connection", "red"),
-                        ],
-                    ),
-                )
-                continue
-
-            results = state.results[host]
-
-            meta = state.meta[host]
-            success_ops = results.success_ops
-            partial_ops = results.partial_ops
-            # TODO: type meta object
-            changed_ops = success_ops - meta.ops_no_change  # type: ignore
-            error_ops = results.error_ops
-            ignored_error_ops = results.ignored_error_ops
-
-            host_args = ("green",)
-            host_kwargs = {}
-
-            # If all ops got complete
-            if results.ops == meta.ops:
-                # We had some errors - but we ignored them - so "warning" color
-                if error_ops != 0:
-                    host_args = ("yellow",)
-
-            # Ops did not complete!
-            else:
-                host_args = ("red",)
-                host_kwargs["bold"] = True
-
-            changed_str = "Changed: {0}".format(click.style(f"{changed_ops}", bold=True))
-            if partial_ops:
-                changed_str = f"{changed_str} ({partial_ops} partial)"
-
-            error_str = "Errors: {0}".format(click.style(f"{error_ops}", bold=True))
-            if ignored_error_ops:
-                error_str = f"{error_str} ({ignored_error_ops} ignored)"
-
-            rows.append(
-                (
-                    logger.info,
-                    [
-                        host.style_print_prefix(*host_args, **host_kwargs),
-                        changed_str,
-                        "No change: {0}".format(click.style(f"{meta.ops_no_change}", bold=True)),
-                        error_str,
-                    ],
-                ),
-            )
-
-        if i != len(group_combinations):
-            rows.append((lambda m: click.echo(m, err=True), []))
 
     print_rows(rows)

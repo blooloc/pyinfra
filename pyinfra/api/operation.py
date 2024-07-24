@@ -11,7 +11,7 @@ from functools import wraps
 from inspect import signature
 from io import StringIO
 from types import FunctionType
-from typing import Any, Callable, Generator, Iterator, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterator, Optional, cast
 
 from typing_extensions import ParamSpec
 
@@ -36,13 +36,16 @@ from .util import (
 
 op_meta_default = object()
 
+if TYPE_CHECKING:
+    from pyinfra.connectors.util import CommandOutput
+
 
 class OperationMeta:
     _hash: str
 
-    _combined_output_lines = None
+    _combined_output: Optional["CommandOutput"] = None
     _commands: Optional[list[Any]] = None
-    _maybe_is_change: Optional[bool] = False
+    _maybe_is_change: Optional[bool] = None
     _success: Optional[bool] = None
 
     def __init__(self, hash, is_change: Optional[bool]):
@@ -69,13 +72,13 @@ class OperationMeta:
         self,
         success: bool,
         commands: list[Any],
-        combined_output_lines,
+        combined_output: "CommandOutput",
     ) -> None:
         if self.is_complete():
             raise RuntimeError("Cannot complete an already complete operation")
         self._success = success
         self._commands = commands
-        self._combined_output_lines = combined_output_lines
+        self._combined_output = combined_output
 
     def is_complete(self) -> bool:
         return self._success is not None
@@ -83,6 +86,19 @@ class OperationMeta:
     def _raise_if_not_complete(self) -> None:
         if not self.is_complete():
             raise RuntimeError("Cannot evaluate operation result before execution")
+
+    @property
+    def will_change(self) -> bool:
+        if self._maybe_is_change is not None:
+            return self._maybe_is_change
+
+        op_data = context.state.get_op_data_for_host(context.host, self._hash)
+        cmd_gen = op_data.command_generator
+        for _ in cmd_gen():
+            self._maybe_is_change = True
+            return True
+        self._maybe_is_change = False
+        return False
 
     def _did_change(self) -> bool:
         return bool(self._success and len(self._commands or []) > 0)
@@ -95,8 +111,9 @@ class OperationMeta:
     def did_not_change(self):
         return context.host.when(lambda: not self._did_change())
 
-    def did_succeed(self) -> bool:
-        self._raise_if_not_complete()
+    def did_succeed(self, _raise_if_not_complete=True) -> bool:
+        if _raise_if_not_complete:
+            self._raise_if_not_complete()
         return self._success is True
 
     def did_error(self) -> bool:
@@ -108,29 +125,19 @@ class OperationMeta:
     def changed(self) -> bool:
         if self.is_complete():
             return self._did_change()
+        return self.will_change
 
-        if self._maybe_is_change is not None:
-            return self._maybe_is_change
-
-        op_data = context.state.get_op_data_for_host(context.host, self._hash)
-        cmd_gen = op_data.command_generator
-        for _ in cmd_gen():
-            return True
-        return False
-
-    # Output lines
-    def _get_lines(self, types=("stdout", "stderr")):
+    @property
+    def stdout_lines(self) -> list[str]:
         self._raise_if_not_complete()
-        assert self._combined_output_lines is not None
-        return [line for type_, line in self._combined_output_lines if type_ in types]
+        assert self._combined_output is not None
+        return self._combined_output.stdout_lines
 
     @property
-    def stdout_lines(self):
-        return self._get_lines(types=("stdout",))
-
-    @property
-    def stderr_lines(self):
-        return self._get_lines(types=("stderr",))
+    def stderr_lines(self) -> list[str]:
+        self._raise_if_not_complete()
+        assert self._combined_output is not None
+        return self._combined_output.stderr_lines
 
     @property
     def stdout(self) -> str:
@@ -246,20 +253,28 @@ def _wrap_operation(func: Callable[P, Generator], _set_in_op: bool = True) -> Py
             if has_run:
                 return OperationMeta(op_hash, is_change=False)
 
+        # Grab a reference to any *current* deploy data as this may change when
+        # we later evaluate the operation at runtime.This means we put back the
+        # expected deploy data.
+        current_deploy_data = host.current_deploy_data
+
         # "Run" operation - here we make a generator that will yield out actual commands to execute
         # and, if we're diff-ing, we then iterate the generator now to determine if any changes
         # *would* be made based on the *current* remote state.
 
         def command_generator() -> Iterator[PyinfraCommand]:
-            # Check global _if_ argument function and do nothing if returns False
+            # Check global _if argument function and do nothing if returns False
             if state.is_executing:
                 _ifs = global_arguments.get("_if")
-                if _ifs and not all(_if() for _if in _ifs):
+                if isinstance(_ifs, list) and not all(_if() for _if in _ifs):
+                    return
+                elif callable(_ifs) and not _ifs():
                     return
 
             host.in_op = _set_in_op
             host.current_op_hash = op_hash
             host.current_op_global_arguments = global_arguments
+            host.current_op_deploy_data = current_deploy_data
 
             try:
                 for command in func(*args, **kwargs):
@@ -270,6 +285,7 @@ def _wrap_operation(func: Callable[P, Generator], _set_in_op: bool = True) -> Py
                 host.in_op = False
                 host.current_op_hash = None
                 host.current_op_global_arguments = None
+                host.current_op_deploy_data = None
 
         op_is_change = None
         if state.should_check_for_changes():

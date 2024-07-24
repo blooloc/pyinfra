@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import shlex
-from distutils.spawn import find_executable
 from random import uniform
+from shutil import which
 from socket import error as socket_error, gaierror
 from time import sleep
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
@@ -122,14 +122,18 @@ class SSHConnector(BaseConnector):
     .. code:: python
 
         hosts = (
-            [
-                "my-host-1.net",
-                "my-host-2.net",
-            ],
-            {
-                "ssh_username": "ssh-user",
-            },
+            ["my-host-1.net", "my-host-2.net"],
+            {"ssh_user": "ssh-user"},
         )
+
+    Multiple hosts with different SSH usernames:
+
+    .. code:: python
+
+        hosts = [
+            ("my-host-1.net", {"ssh_user": "ssh-user"}),
+            ("my-host-2.net", {"ssh_user": "other-user"}),
+        ]
     """
 
     handles_execution = True
@@ -539,7 +543,7 @@ class SSHConnector(BaseConnector):
         if self.data["ssh_password"]:
             raise NotImplementedError("Rsync does not currently work with SSH passwords.")
 
-        if not find_executable("rsync"):
+        if not which("rsync"):
             raise NotImplementedError("The `rsync` binary is not available on this system.")
 
     def rsync(

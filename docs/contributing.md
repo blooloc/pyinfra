@@ -13,7 +13,7 @@ Third party pull requests help expand pyinfra's functionality and are essential 
 
 ## Branches
 
-+ There is a branch per major version, ie `2.x`, that tracks the latest release of that version
++ There is a branch per major version, ie `3.x`, that tracks the latest release of that version
 + Changes should generally be based off the latest major branch, unless fixing an old version
 
 ## Dev Setup
@@ -30,15 +30,27 @@ cd pyinfra
 pip install -e '.[dev]'
 ```
 
-## Tests
+### Code Style & Type Checking
 
-GitHub will run all the test suites as part of any pull requests, here's how you can run them locally:
+Code style is enforced via Black, isort and flake8. Types are checked with mypy currently, and pyright is recommended for local development though currently optional. There is a script to run the linting & type-checking:
 
-### Unit Tests
+```sh
+scripts/dev-lint.sh
+```
+
+### Tests
+
+GitHub will run all the test suites as part of any pull requests. There's a handy script that runs the unit tests:
+
+```sh
+scripts/dev-test.sh
+```
+
+#### Unit Tests
 
 Use `pytest` to run the unit tests, or `pytest --cov` to run with coverage. Pull requests are expected to be tested and not drop overall project coverage by >1%.
 
-### End to End Tests
+#### End to End Tests
 
 The end to end tests are also executed via `pytest` but not selected by default, options/usage:
 
@@ -64,7 +76,3 @@ To view ([localhost:8000](http://localhost:8000)):
 ```sh
 python -m http.server -d docs/build/
 ```
-
-## Code Style
-
-Code is linted using `flake8` and uses the `black` / `isort` codestyles. To check you can just run `flake8` from the root directory.

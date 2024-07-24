@@ -3,6 +3,8 @@ The server module takes care of os-level state. Targets POSIX compatibility, tes
 Linux/BSD.
 """
 
+from __future__ import annotations
+
 import shlex
 from io import StringIO
 from itertools import filterfalse, tee
@@ -18,6 +20,7 @@ from pyinfra.facts.files import Directory, FindInFile, Link
 from pyinfra.facts.server import (
     Crontab,
     Groups,
+    Home,
     Hostname,
     KernelModules,
     Locales,
@@ -38,6 +41,7 @@ from . import (
     openrc,
     pacman,
     pkg,
+    runit,
     systemd,
     sysvinit,
     upstart,
@@ -139,7 +143,7 @@ def wait(port: int):
 
 
 @operation(is_idempotent=False)
-def shell(commands):
+def shell(commands: str | list[str]):
     """
     Run raw shell code on server during a deploy. If the command would
     modify data that would be in a fact, the fact would not be updated
@@ -166,7 +170,7 @@ def shell(commands):
 
 
 @operation(is_idempotent=False)
-def script(src, args=()):
+def script(src: str, args=()):
     """
     Upload and execute a local script on the remote host.
 
@@ -199,7 +203,7 @@ def script(src, args=()):
 
 
 @operation(is_idempotent=False)
-def script_template(src, args=(), **data):
+def script_template(src: str, args=(), **data):
     """
     Generate, upload and execute a local script template on the remote host.
 
@@ -229,7 +233,7 @@ def script_template(src, args=(), **data):
 
 
 @operation()
-def modprobe(module, present=True, force=False):
+def modprobe(module: str, present=True, force=False):
     """
     Load/unload kernel modules.
 
@@ -281,11 +285,11 @@ def modprobe(module, present=True, force=False):
 
 @operation()
 def mount(
-    path,
+    path: str,
     mounted=True,
-    options=None,
-    device=None,
-    fs_type=None,
+    options: list[str] | None = None,
+    device: str | None = None,
+    fs_type: str | None = None,
     # TODO: do we want to manage fstab here?
     # update_fstab=False,
 ):
@@ -344,7 +348,7 @@ def mount(
 
 
 @operation()
-def hostname(hostname, hostname_file=None):
+def hostname(hostname: str, hostname_file: str | None = None):
     """
     Set the system hostname using ``hostnamectl`` or ``hostname`` on older systems.
 
@@ -402,8 +406,8 @@ def hostname(hostname, hostname_file=None):
 
 @operation()
 def sysctl(
-    key,
-    value,
+    key: str,
+    value: str | int | list[str | int],
     persist=False,
     persist_file="/etc/sysctl.conf",
 ):
@@ -449,12 +453,12 @@ def sysctl(
 
 @operation()
 def service(
-    service,
+    service: str,
     running=True,
     restarted=False,
     reloaded=False,
-    command=None,
-    enabled=None,
+    command: str | None = None,
+    enabled: bool | None = None,
 ):
     """
     Manage the state of services. This command checks for the presence of all the
@@ -489,6 +493,9 @@ def service(
     elif host.get_fact(Which, command="initctl"):
         service_operation = upstart.service
 
+    elif host.get_fact(Which, command="sv"):
+        service_operation = runit.service
+
     elif (
         host.get_fact(Which, command="service")
         or host.get_fact(Link, path="/etc/init.d")
@@ -518,7 +525,7 @@ def service(
 
 @operation()
 def packages(
-    packages,
+    packages: str | list[str],
     present=True,
 ):
     """
@@ -561,7 +568,7 @@ def packages(
     elif host.get_fact(Which, command="pacman"):
         package_operation = pacman.packages
 
-    elif host.get_fact(Which, command="xbps"):
+    elif host.get_fact(Which, command="xbps-install") or host.get_fact(Which, command="xbps"):
         package_operation = xbps.packages
 
     elif host.get_fact(Which, command="yum"):
@@ -583,16 +590,16 @@ def packages(
 
 @operation()
 def crontab(
-    command,
+    command: str,
     present=True,
-    user=None,
-    cron_name=None,
+    user: str | None = None,
+    cron_name: str | None = None,
     minute="*",
     hour="*",
     month="*",
     day_of_week="*",
     day_of_month="*",
-    special_time=None,
+    special_time: str | None = None,
     interpolate_variables=False,
 ):
     """
@@ -663,7 +670,7 @@ def crontab(
 
     exists = existing_crontab is not None
 
-    edit_commands = []
+    edit_commands: list[str | StringCommand] = []
     temp_filename = host.get_temp_filename()
 
     if special_time:
@@ -758,7 +765,7 @@ def crontab(
 
 
 @operation()
-def group(group, present=True, system=False, gid=None):
+def group(group: str, present=True, system=False, gid: int | str | None = None):
     """
     Add/remove system groups.
 
@@ -827,12 +834,12 @@ def group(group, present=True, system=False, gid=None):
 
 @operation()
 def user_authorized_keys(
-    user,
-    public_keys,
-    group=None,
+    user: str,
+    public_keys: str | list[str],
+    group: str | None = None,
     delete_keys=False,
-    authorized_key_directory=None,
-    authorized_key_filename=None,
+    authorized_key_directory: str | None = None,
+    authorized_key_filename: str | None = None,
 ):
     """
     Manage `authorized_keys` of system users.
@@ -858,7 +865,9 @@ def user_authorized_keys(
     """
 
     if not authorized_key_directory:
-        authorized_key_directory = f"/home/{user}/.ssh/"
+        home = host.get_fact(Home, user=user)
+        authorized_key_directory = f"{home}/.ssh"
+
     if not authorized_key_filename:
         authorized_key_filename = "authorized_keys"
 
@@ -923,22 +932,22 @@ def user_authorized_keys(
 
 @operation()
 def user(
-    user,
+    user: str,
     present=True,
-    home=None,
-    shell=None,
-    group=None,
-    groups=None,
-    public_keys=None,
+    home: str | None = None,
+    shell: str | None = None,
+    group: str | None = None,
+    groups: list[str] | None = None,
+    public_keys: str | list[str] | None = None,
     delete_keys=False,
     ensure_home=True,
     create_home=False,
     system=False,
-    uid=None,
-    comment=None,
+    uid: int | None = None,
+    comment: str | None = None,
     add_deploy_dir=True,
     unique=True,
-    password=None,
+    password: str | None = None,
 ):
     """
     Add/remove/update system users & their ssh `authorized_keys`.
@@ -1124,7 +1133,7 @@ def user(
                 existing_user["password"] = password
 
     # Ensure home directory ownership
-    if ensure_home:
+    if ensure_home and home:
         yield from files.directory._inner(
             path=home,
             user=user,
@@ -1147,7 +1156,7 @@ def user(
 
 @operation()
 def locale(
-    locale,
+    locale: str,
     present=True,
 ):
     """
@@ -1217,10 +1226,10 @@ def locale(
 
 @operation()
 def security_limit(
-    domain,
-    limit_type,
-    item,
-    value,
+    domain: str,
+    limit_type: str,
+    item: str,
+    value: int,
 ):
     """
     Edit /etc/security/limits.conf configuration.
@@ -1239,7 +1248,7 @@ def security_limit(
             domain='*',
             limit_type='soft',
             item='nofile',
-            value='1024',
+            value=1024,
         )
     """
 

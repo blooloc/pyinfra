@@ -2,6 +2,8 @@
 Manage pkgin packages.
 """
 
+from __future__ import annotations
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.facts.pkgin import PkginPackages
@@ -35,7 +37,7 @@ _update = update._inner  # noqa: E305
 
 @operation()
 def packages(
-    packages=None,
+    packages: str | list[str] | None = None,
     present=True,
     latest=False,
     update=False,

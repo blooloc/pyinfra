@@ -14,7 +14,9 @@ class SEBoolean(FactBase):
     If ``boolean`` does not exist, ``SEBoolean`` returns the empty string.
     """
 
-    requires_command = "getsebool"
+    def requires_command(self, boolean) -> str:
+        return "getsebool"
+
     default = str
 
     def command(self, boolean):
@@ -60,8 +62,10 @@ class FileContextMapping(FactBase):
     Note: This fact requires root privileges.
     """
 
-    requires_command = "semanage"
     default = dict
+
+    def requires_command(self, target) -> str:
+        return "semanage"
 
     def command(self, target):
         return "set -o pipefail && semanage fcontext -n -l | (grep '^{0}' || true)".format(target)
@@ -87,10 +91,12 @@ class SEPorts(FactBase):
         }
     """
 
-    requires_command = "semanage"
     default = dict
     # example output: amqp_port_t                    tcp      15672, 5671-5672  # noqa: SC100
     _regex = re.compile(r"^([\w_]+)\s+(\w+)\s+([\w\-,\s]+)$")
+
+    def requires_command(self) -> str:
+        return "semanage"
 
     def command(self):
         return "semanage port -ln"
@@ -122,8 +128,10 @@ class SEPort(FactBase):
     Note: ``policycoreutils-dev`` must be installed for this to work.
     """
 
-    requires_command = "sepolicy"
     default = str
+
+    def requires_command(self, protocol, port) -> str:
+        return "sepolicy"
 
     def command(self, protocol, port):
         return "(sepolicy network -p {0} 2>/dev/null || true) | grep {1}".format(port, protocol)

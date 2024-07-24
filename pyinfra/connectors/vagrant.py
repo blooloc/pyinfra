@@ -93,13 +93,13 @@ def _make_name_data(host):
         "ssh_hostname": host["HostName"],
     }
 
-    for config_key, data_key in (
-        ("Port", "ssh_port"),
-        ("User", "ssh_user"),
-        ("IdentityFile", "ssh_key"),
+    for config_key, data_key, data_cast in (
+        ("Port", "ssh_port", int),
+        ("User", "ssh_user", str),
+        ("IdentityFile", "ssh_key", str),
     ):
         if config_key in host:
-            data[data_key] = host[config_key]
+            data[data_key] = data_cast(host[config_key])
 
     # Update any configured JSON data
     if vagrant_host in vagrant_options.get("data", {}):

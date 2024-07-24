@@ -76,7 +76,7 @@ def _run_host_op(state: "State", host: "Host", op_hash: str) -> Optional[bool]:
     did_error = False
     executed_commands = 0
     commands = []
-    all_combined_output_lines: list[OutputLine] = []
+    all_output_lines: list[OutputLine] = []
 
     for command in op_data.command_generator():
         commands.append(command)
@@ -102,19 +102,19 @@ def _run_host_op(state: "State", host: "Host", op_hash: str) -> Optional[bool]:
                 )
 
         elif isinstance(command, StringCommand):
-            combined_output_lines = CommandOutput([])
+            output_lines = CommandOutput([])
             try:
-                status, combined_output_lines = command.execute(
+                status, output_lines = command.execute(
                     state,
                     host,
                     connector_arguments,
                 )
             except (timeout_error, socket_error, SSHException) as e:
                 log_host_command_error(host, e, timeout=timeout)
-            all_combined_output_lines.extend(combined_output_lines)
+            all_output_lines.extend(output_lines)
             # If we failed and have not already printed the stderr, print it
             if status is False and not state.print_output:
-                print_host_combined_output(host, combined_output_lines)
+                print_host_combined_output(host, output_lines)
 
         else:
             try:
@@ -169,7 +169,7 @@ def _run_host_op(state: "State", host: "Host", op_hash: str) -> Optional[bool]:
     op_data.operation_meta.set_complete(
         op_success,
         commands,
-        all_combined_output_lines,
+        CommandOutput(all_output_lines),
     )
 
     return return_status

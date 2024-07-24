@@ -29,23 +29,26 @@ INSTALL_REQUIRES = (
     "pywinrm",
     "typeguard",
     "distro>=1.6,<2",
+    "packaging>=16.1",
     # Backport of graphlib used for DAG operation ordering
     'graphlib_backport ; python_version < "3.9"',
     # Backport of typing for Unpack (added 3.11)
     'typing-extensions ; python_version < "3.11"',
+    # Backport of importlib.metadata for entry_points(group=...) (added 3.10)
+    'importlib_metadata>=3.6 ; python_version < "3.10"',
 )
 
 TEST_REQUIRES = (
     # Unit testing
-    "pytest==7.2.0",
-    "coverage==6.5",
-    "pytest-cov==4.0.0",
+    "pytest==8.2.1",
+    "coverage==7.5.1",
+    "pytest-cov==5.0.0",
     # Formatting & linting
-    "black==22.3.0",
-    "isort==5.10.1",
-    "flake8==4.0.1",
-    "flake8-black==0.3.0",
-    "flake8-isort==4.1.1",
+    "black==24.4.2",
+    "isort==5.13.2",
+    "flake8==7.0.0",
+    "flake8-black==0.3.6",
+    "flake8-isort==6.1.1",
     # Typing
     "mypy",
     "types-cryptography",
@@ -56,7 +59,7 @@ TEST_REQUIRES = (
 )
 
 DOCS_REQUIRES = (
-    "pyinfra-guzzle_sphinx_theme==0.15",
+    "pyinfra-guzzle_sphinx_theme==0.16",
     "myst-parser==2.0.0",
     "sphinx==6.2.1",
 )
@@ -125,6 +128,7 @@ if __name__ == "__main__":
                 "vagrant = pyinfra.connectors.vagrant:VagrantInventoryConnector",
             ],
         },
+        python_requires=">=3.8",
         install_requires=INSTALL_REQUIRES,
         extras_require={
             "test": TEST_REQUIRES,
@@ -141,10 +145,11 @@ if __name__ == "__main__":
             "License :: OSI Approved :: MIT License",
             "Operating System :: OS Independent",
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
             "Topic :: System :: Systems Administration",
             "Topic :: System :: Installation/Setup",
             "Topic :: Utilities",

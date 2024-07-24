@@ -85,7 +85,7 @@ Adding data to inventories is covered in detail here: :doc:`inventory-data`. Dat
 Host Facts
 ~~~~~~~~~~
 
-Facts allow you to use information about the target host to control and configure operations. A good example is switching between ``apt`` & ``yum`` depending on the Linux distribution. Facts are imported from ``pyinfra.facts.*`` and can be retreived using the ``host.get_fact`` function:
+Facts allow you to use information about the target host to control and configure operations. A good example is switching between ``apt`` & ``yum`` depending on the Linux distribution. Facts are imported from ``pyinfra.facts.*`` and can be retrieved using the ``host.get_fact`` function:
 
 .. code:: python
 
@@ -145,14 +145,14 @@ All operations return an operation meta object which provides information about 
 
     server.shell(
         name="Bootstrap user",
-        command=["..."],
+        commands=["..."],
         _if=create_user,
     )
 
 Operation Output
 ~~~~~~~~~~~~~~~~
 
-pyinfra doesn't immediately execute operations meaning output is not available right away. It is possible to access this output at runtime by providing a callback function using the :ref:`operations:python.call` operation.
+pyinfra doesn't immediately execute operations, meaning output is not available right away. It is possible to access this output at runtime by providing a callback function using the :ref:`operations:python.call` operation.
 
 .. code:: python
 
@@ -216,7 +216,7 @@ See more in :doc:`examples: groups & roles <./examples/groups_roles>`.
 The ``config`` Object
 ---------------------
 
-Like ``host`` and ``inventory``, ``config`` can be used to set global defaults for operations. For example, to use sudo in all operations following:
+Like ``host`` and ``inventory``, ``config`` can be used to set global defaults for operations. For example, to use sudo in all following operations:
 
 .. code:: python
 

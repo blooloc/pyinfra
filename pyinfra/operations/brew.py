@@ -2,7 +2,9 @@
 Manage brew packages on mac/OSX. See https://brew.sh/
 """
 
-import urllib
+from __future__ import annotations
+
+import urllib.parse
 
 from pyinfra import host
 from pyinfra.api import operation
@@ -37,7 +39,7 @@ _upgrade = upgrade  # noqa: E305
 
 @operation()
 def packages(
-    packages=None,
+    packages: str | list[str] | None = None,
     present=True,
     latest=False,
     update=False,
@@ -93,7 +95,7 @@ def packages(
     )
 
 
-def cask_args(host):
+def cask_args():
     return ("", " --cask") if new_cask_cli(host.get_fact(BrewVersion)) else ("cask ", "")
 
 
@@ -103,12 +105,12 @@ def cask_upgrade():
     Upgrades all brew casks.
     """
 
-    yield "brew %supgrade%s" % cask_args(host)
+    yield "brew %supgrade%s" % cask_args()
 
 
 @operation()
 def casks(
-    casks=None,
+    casks: str | list[str] | None = None,
     present=True,
     latest=False,
     upgrade=False,
@@ -140,7 +142,7 @@ def casks(
     if upgrade:
         yield from cask_upgrade._inner()
 
-    args = cask_args(host)
+    args = cask_args()
 
     yield from ensure_packages(
         host,
@@ -156,7 +158,7 @@ def casks(
 
 
 @operation()
-def tap(src=None, present=True, url=None):
+def tap(src: str | None = None, present=True, url: str | None = None):
     """
     Add/remove brew taps.
 
@@ -199,7 +201,7 @@ def tap(src=None, present=True, url=None):
         host.noop("no tap was specified")
         return
 
-    src = src or urllib.parse.urlparse(url).path.strip("/")
+    src = src or str(urllib.parse.urlparse(url).path).strip("/")
 
     if len(src.split("/")) != 2:
         host.noop("src '{0}' doesn't have two components.".format(src))

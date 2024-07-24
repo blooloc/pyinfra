@@ -10,21 +10,11 @@ other host B while I operate on this host A).
 
 from __future__ import annotations
 
+import inspect
 import re
 from inspect import getcallargs
 from socket import error as socket_error, timeout as timeout_error
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Generic,
-    Iterable,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterable, Optional, Type, TypeVar, cast
 
 import click
 import gevent
@@ -32,12 +22,11 @@ from paramiko import SSHException
 
 from pyinfra import logger
 from pyinfra.api import StringCommand
-from pyinfra.api.arguments import pop_global_arguments
+from pyinfra.api.arguments import all_global_arguments, pop_global_arguments
 from pyinfra.api.util import (
     get_kwargs_str,
     log_error_or_warning,
     log_host_command_error,
-    make_hash,
     print_host_combined_output,
 )
 from pyinfra.connectors.util import CommandOutput
@@ -65,16 +54,28 @@ class FactBase(Generic[T]):
 
     abstract: bool = True
 
-    shell_executable: Optional[str] = None
+    shell_executable: str | None = None
 
-    requires_command: Optional[str] = None
+    command: Callable[..., str | StringCommand]
 
-    command: Union[str, Callable]
+    def requires_command(self, *args, **kwargs) -> str | None:
+        return None
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
         module_name = cls.__module__.replace("pyinfra.facts.", "")
         cls.name = f"{module_name}.{cls.__name__}"
+
+        # Check that fact's `command` method does not inadvertently take a global
+        # argument, most commonly `name`.
+        if hasattr(cls, "command") and callable(cls.command):
+            command_args = set(inspect.signature(cls.command).parameters.keys())
+            global_args = set([name for name, _ in all_global_arguments()])
+            command_global_args = command_args & global_args
+
+            if len(command_global_args) > 0:
+                names = ", ".join(command_global_args)
+                raise TypeError(f"{cls.name}'s arguments {names} are reserved for global arguments")
 
     @staticmethod
     def default() -> T:
@@ -101,8 +102,7 @@ class ShortFactBase(Generic[T]):
         module_name = cls.__module__.replace("pyinfra.facts.", "")
         cls.name = f"{module_name}.{cls.__name__}"
 
-    @staticmethod
-    def process_data(data):
+    def process_data(self, data):
         return data
 
 
@@ -118,62 +118,29 @@ def _make_command(command_attribute, host_args):
     return command_attribute
 
 
-def _get_executor_kwargs(
-    state: "State",
-    host: "Host",
-    override_kwargs: Optional[dict[str, Any]] = None,
-    override_kwarg_keys: Optional[list[str]] = None,
-):
-    if override_kwargs is None:
-        override_kwargs = {}
-    if override_kwarg_keys is None:
-        override_kwarg_keys = []
-
-    # Use the current operation global kwargs, or generate defaults
-    global_kwargs = host.current_op_global_arguments
-    if not global_kwargs:
-        global_kwargs, _ = pop_global_arguments({}, state, host)
-
-    # Apply any current op kwargs that *weren't* found in the overrides
-    override_kwargs.update(
-        {key: value for key, value in global_kwargs.items() if key not in override_kwarg_keys},
-    )
-
-    return {key: value for key, value in override_kwargs.items() if key in CONNECTOR_ARGUMENT_KEYS}
-
-
 def _handle_fact_kwargs(state, host, cls, args, kwargs):
     args = args or []
     kwargs = kwargs or {}
 
-    # TODO: this is here to avoid popping stuff accidentally, this is horrible! Change the
-    # pop function to return the clean kwargs to avoid the indirect mutation.
-    kwargs = kwargs.copy()
+    # Start with a (shallow) copy of current operation kwargs if any
+    ctx_kwargs = (host.current_op_global_arguments or {}).copy()
+    # Update with the input kwargs (overrides)
+    ctx_kwargs.update(kwargs)
 
-    # Get the defaults *and* overrides by popping from kwargs, executor kwargs passed
-    # into get_fact override everything else (applied below).
-    override_kwargs, override_kwarg_keys = pop_global_arguments(
-        kwargs,
+    # Pop executor kwargs, pass remaining
+    global_kwargs, _ = pop_global_arguments(
+        ctx_kwargs,
         state=state,
         host=host,
-        keys_to_check=CONNECTOR_ARGUMENT_KEYS,
     )
 
-    executor_kwargs = _get_executor_kwargs(
-        state,
-        host,
-        override_kwargs=override_kwargs,  # type: ignore[arg-type]
-        override_kwarg_keys=override_kwarg_keys,
-    )
+    fact_kwargs = {key: value for key, value in kwargs.items() if key not in global_kwargs}
 
-    fact_kwargs = {}
-
-    if args or kwargs:
-        assert not isinstance(cls.command, str)
+    if args or fact_kwargs:
         # Merges args & kwargs into a single kwargs dictionary
-        fact_kwargs = getcallargs(cls().command, *args, **kwargs)
+        fact_kwargs = getcallargs(cls().command, *args, **fact_kwargs)
 
-    return fact_kwargs, executor_kwargs
+    return fact_kwargs, global_kwargs
 
 
 def get_facts(state: "State", *args, **kwargs):
@@ -241,7 +208,7 @@ def _get_fact(
     fact = cls()
     name = fact.name
 
-    fact_kwargs, executor_kwargs = _handle_fact_kwargs(state, host, cls, args, kwargs)
+    fact_kwargs, global_kwargs = _handle_fact_kwargs(state, host, cls, args, kwargs)
 
     kwargs_str = get_kwargs_str(fact_kwargs)
     logger.debug(
@@ -257,15 +224,9 @@ def _get_fact(
             raise_exceptions=True,
         )
 
-    ignore_errors = (
-        host.current_op_global_arguments["_ignore_errors"]
-        if host.in_op and host.current_op_global_arguments
-        else state.config.IGNORE_ERRORS
-    )
-
     # Facts can override the shell (winrm powershell vs cmd support)
     if fact.shell_executable:
-        executor_kwargs["_shell_executable"] = fact.shell_executable
+        global_kwargs["_shell_executable"] = fact.shell_executable
 
     command = _make_command(fact.command, fact_kwargs)
     requires_command = _make_command(fact.requires_command, fact_kwargs)
@@ -284,6 +245,10 @@ def _get_fact(
     status = False
     output = CommandOutput([])
 
+    executor_kwargs = {
+        key: value for key, value in global_kwargs.items() if key in CONNECTOR_ARGUMENT_KEYS
+    }
+
     try:
         status, output = host.run_shell_command(
             command,
@@ -295,7 +260,7 @@ def _get_fact(
         log_host_command_error(
             host,
             e,
-            timeout=executor_kwargs["_timeout"],
+            timeout=global_kwargs.get("_timeout"),
         )
 
     stdout_lines, stderr_lines = output.stdout_lines, output.stderr_lines
@@ -334,22 +299,15 @@ def _get_fact(
 
         log_error_or_warning(
             host,
-            ignore_errors,
+            global_kwargs["_ignore_errors"],
             description=("could not load fact: {0} {1}").format(name, get_kwargs_str(fact_kwargs)),
         )
 
     # Check we've not failed
-    if not status and not ignore_errors and apply_failed_hosts:
+    if apply_failed_hosts and not status and not global_kwargs["_ignore_errors"]:
         state.fail_hosts({host})
 
     return data
-
-
-def _get_fact_hash(state: "State", host: "Host", cls, args, kwargs):
-    if issubclass(cls, ShortFactBase):
-        cls = cls.fact
-    fact_kwargs, executor_kwargs = _handle_fact_kwargs(state, host, cls, args, kwargs)
-    return make_hash((cls, fact_kwargs, executor_kwargs))
 
 
 def get_host_fact(

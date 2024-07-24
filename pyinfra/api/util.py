@@ -109,16 +109,16 @@ def get_caller_frameinfo(frame_offset: int = 0):
 
 
 def get_operation_order_from_stack(state: "State"):
+
     stack_items = list(reversed(stack()))
 
+    i = 0
     # Find the *first* occurrence of our deploy file in the reversed stack
     if state.current_deploy_filename:
         for i, stack_item in enumerate(stack_items):
             frame = getframeinfo(stack_item[0])
             if frame.filename == state.current_deploy_filename:
                 break
-    else:
-        i = 0
 
     # Now generate a list of line numbers *following that file*
     line_numbers = []
@@ -139,7 +139,7 @@ def get_operation_order_from_stack(state: "State"):
     return line_numbers
 
 
-def get_template(filename_or_io: str):
+def get_template(filename_or_io: str | IO):
     """
     Gets a jinja2 ``Template`` object for the input filename or string, with caching
     based on the filename of the template, or the SHA1 of the input string.
@@ -241,7 +241,7 @@ def log_error_or_warning(
     )
 
 
-def log_host_command_error(host: "Host", e: Exception, timeout: int = 0) -> None:
+def log_host_command_error(host: "Host", e: Exception, timeout: int | None = 0) -> None:
     if isinstance(e, timeout_error):
         logger.error(
             "{0}{1}".format(
@@ -301,19 +301,27 @@ def make_hash(obj):
             if isinstance(obj, int)
             # Constants - the values can change between hosts but we should still
             # group them under the same operation hash.
-            else "_PYINFRA_CONSTANT"
-            if obj in (True, False, None)
-            # Plain strings
-            else obj
-            if isinstance(obj, str)
-            # Objects with __name__s
-            else obj.__name__
-            if hasattr(obj, "__name__")
-            # Objects with names
-            else obj.name
-            if hasattr(obj, "name")
-            # Repr anything else
-            else repr(obj)
+            else (
+                "_PYINFRA_CONSTANT"
+                if obj in (True, False, None)
+                # Plain strings
+                else (
+                    obj
+                    if isinstance(obj, str)
+                    # Objects with __name__s
+                    else (
+                        obj.__name__
+                        if hasattr(obj, "__name__")
+                        # Objects with names
+                        else (
+                            obj.name
+                            if hasattr(obj, "name")
+                            # Repr anything else
+                            else repr(obj)
+                        )
+                    )
+                )
+            )
         )
 
     return sha1_hash(hash_string)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from pyinfra.api import FactBase
@@ -8,11 +10,14 @@ class UpstartStatus(FactBase):
     Returns a dict of name -> status for upstart managed services.
     """
 
-    command = "initctl list"
-    requires_command = "initctl"
+    def requires_command(self) -> str:
+        return "initctl"
 
     regex = r"^([a-z\-]+) [a-z]+\/([a-z]+)"
     default = dict
+
+    def command(self):
+        return "initctl list"
 
     def process(self, output):
         services = {}

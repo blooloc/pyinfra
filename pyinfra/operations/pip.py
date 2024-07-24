@@ -3,6 +3,8 @@ Manage pip (python) packages. Compatible globally or inside
 a virtualenv (virtual environment).
 """
 
+from __future__ import annotations
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.facts.files import File
@@ -14,8 +16,8 @@ from .util.packaging import ensure_packages
 
 @operation()
 def virtualenv(
-    path,
-    python=None,
+    path: str,
+    python: str | None = None,
     venv=False,
     site_packages=False,
     always_copy=False,
@@ -81,8 +83,8 @@ _virtualenv = virtualenv._inner  # noqa
 
 @operation()
 def venv(
-    path,
-    python=None,
+    path: str,
+    python: str | None = None,
     site_packages=False,
     always_copy=False,
     present=True,
@@ -117,14 +119,14 @@ def venv(
 
 @operation()
 def packages(
-    packages=None,
+    packages: str | list[str] | None = None,
     present=True,
     latest=False,
-    requirements=None,
+    requirements: str | None = None,
     pip="pip",
-    virtualenv=None,
-    virtualenv_kwargs=None,
-    extra_install_args=None,
+    virtualenv: str | None = None,
+    virtualenv_kwargs: dict | None = None,
+    extra_install_args: str | None = None,
 ):
     """
     Install/remove/update pip packages.

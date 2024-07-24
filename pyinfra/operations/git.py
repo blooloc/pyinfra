@@ -2,6 +2,8 @@
 Manage git repositories and configuration.
 """
 
+from __future__ import annotations
+
 import re
 
 from pyinfra import host
@@ -14,7 +16,7 @@ from .util.files import chown, unix_path_join
 
 
 @operation()
-def config(key, value, multi_value=False, repo=None):
+def config(key: str, value: str, multi_value=False, repo: str | None = None):
     """
     Manage git config for a repository or globally.
 
@@ -62,13 +64,13 @@ def config(key, value, multi_value=False, repo=None):
 
 @operation()
 def repo(
-    src,
-    dest,
-    branch=None,
+    src: str,
+    dest: str,
+    branch: str | None = None,
     pull=True,
     rebase=False,
-    user=None,
-    group=None,
+    user: str | None = None,
+    group: str | None = None,
     ssh_keyscan=False,
     update_submodules=False,
     recursive_submodules=False,
@@ -155,19 +157,19 @@ def repo(
 
 @operation()
 def worktree(
-    worktree,
-    repo=None,
+    worktree: str,
+    repo: str | None = None,
     detached=False,
-    new_branch=None,
-    commitish=None,
+    new_branch: str | None = None,
+    commitish: str | None = None,
     pull=True,
     rebase=False,
-    from_remote_branch=None,
+    from_remote_branch: tuple[str, str] | None = None,
     present=True,
     assume_repo_exists=False,
     force=False,
-    user=None,
-    group=None,
+    user: str | None = None,
+    group: str | None = None,
 ):
     """
     Manage git worktrees.
@@ -336,9 +338,9 @@ def worktree(
 
 @operation()
 def bare_repo(
-    path,
-    user=None,
-    group=None,
+    path: str,
+    user: str | None = None,
+    group: str | None = None,
     present=True,
 ):
     """

@@ -33,7 +33,9 @@ if TYPE_CHECKING:
     from pyinfra.api.state import State
 
 
-def extract_callable_datas(datas: list[Union[Callable[..., Any], Any]]) -> Generator[Any, Any, Any]:
+def extract_callable_datas(
+    datas: list[Union[Callable[..., Any], Any]],
+) -> Generator[Any, Any, Any]:
     for data in datas:
         # Support for dynamic data, ie @deploy wrapped data defaults where
         # the data is stored on the state temporarily.
@@ -110,11 +112,16 @@ class Host:
     current_op_hash: Optional[str] = None
     current_op_global_arguments: Optional["AllArguments"] = None
 
-    # Current context inside a @deploy function (op gen stage)
+    # Current context inside a @deploy function which become part of the op data
     in_deploy: bool = False
     current_deploy_name: Optional[str] = None
     current_deploy_kwargs = None
-    current_deploy_data = None
+
+    # @deploy decorator data is a bit different - we need to handle the case
+    # where we're evaluating an operation at runtime (current_op_) but also
+    # when ordering operations (current_) outside of an operation context.
+    current_op_deploy_data: Optional[dict[str, Any]] = None
+    current_deploy_data: Optional[dict[str, Any]] = None
 
     # Current context during operation execution
     executing_op_hash: Optional[str] = None
@@ -216,9 +223,7 @@ class Host:
         self.log(message_styled, log_func=log_func)
 
     def get_deploy_data(self):
-        if self.current_deploy_data:
-            return self.current_deploy_data
-        return {}
+        return self.current_op_deploy_data or self.current_deploy_data or {}
 
     def noop(self, description):
         """
@@ -333,12 +338,10 @@ class Host:
     T = TypeVar("T")
 
     @overload
-    def get_fact(self, name_or_cls: Type[FactBase[T]], *args, **kwargs) -> T:
-        ...
+    def get_fact(self, name_or_cls: Type[FactBase[T]], *args, **kwargs) -> T: ...
 
     @overload
-    def get_fact(self, name_or_cls: Type[ShortFactBase[T]], *args, **kwargs) -> T:
-        ...
+    def get_fact(self, name_or_cls: Type[ShortFactBase[T]], *args, **kwargs) -> T: ...
 
     def get_fact(self, name_or_cls, *args, **kwargs):
         """

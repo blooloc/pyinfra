@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections import defaultdict
 
@@ -8,11 +10,11 @@ from .util.databases import parse_columns_and_rows
 
 
 def make_mysql_command(
-    database=None,
-    user=None,
-    password=None,
-    host=None,
-    port=None,
+    database: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
     executable="mysql",
 ):
     target_bits = [executable]
@@ -37,7 +39,11 @@ def make_mysql_command(
     return StringCommand(*target_bits)
 
 
-def make_execute_mysql_command(command, ignore_errors=False, **mysql_kwargs):
+def make_execute_mysql_command(
+    command: str | StringCommand,
+    ignore_errors=False,
+    **mysql_kwargs,
+):
     commands_bits = [
         make_mysql_command(**mysql_kwargs),
         "-Be",
@@ -54,8 +60,10 @@ class MysqlFactBase(FactBase):
     abstract = True
 
     mysql_command: str
-    requires_command = "mysql"
     ignore_errors = False
+
+    def requires_command(self, *args, **kwargs) -> str:
+        return "mysql"
 
     def command(
         self,
@@ -64,7 +72,7 @@ class MysqlFactBase(FactBase):
         mysql_password=None,
         mysql_host=None,
         mysql_port=None,
-    ):
+    ) -> StringCommand:
         return make_execute_mysql_command(
             self.mysql_command,
             ignore_errors=self.ignore_errors,
@@ -128,8 +136,7 @@ class MysqlUsers(MysqlFactBase):
     default = dict
     mysql_command = "SELECT * FROM mysql.user"
 
-    @staticmethod
-    def process(output):
+    def process(self, output):
         rows = parse_columns_and_rows(output, "\t")
 
         users = {}
@@ -188,7 +195,7 @@ class MysqlUserGrants(MysqlFactBase):
     # Ignore errors as SHOW GRANTS will error if the user does not exist
     ignore_errors = True
 
-    def command(
+    def command(  # type: ignore[override]
         self,
         user,
         hostname="localhost",
@@ -197,7 +204,7 @@ class MysqlUserGrants(MysqlFactBase):
         mysql_password=None,
         mysql_host=None,
         mysql_port=None,
-    ):
+    ) -> StringCommand:
         self.mysql_command = 'SHOW GRANTS FOR "{0}"@"{1}"'.format(user, hostname)
 
         return super().command(

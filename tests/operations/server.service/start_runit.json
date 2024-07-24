@@ -1,0 +1,29 @@
+{
+    "args": ["nginx"],
+    "facts": {
+        "server.Which": {
+            "command=sv": true
+        },
+        "runit.RunitManaged": {
+            "service=nginx, svdir=/var/service": ["nginx"]
+        },
+        "files.File": {
+            "path=/etc/sv/nginx/down": null
+        },
+        "files.Link": {
+            "path=/var/service/nginx": {
+                "user": "root",
+                "group": "root",
+                "link_target": "/etc/sv/nginx"
+            }
+        },
+        "runit.RunitStatus": {
+            "service=nginx, svdir=/var/service": {
+                "nginx": false
+            }
+        }
+    },
+    "commands": [
+        "SVDIR=/var/service sv start nginx"
+    ]
+}

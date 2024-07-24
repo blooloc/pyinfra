@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+from typing import Iterable
 
 
-def parse_packages(regex, output):
+def parse_packages(regex: str, output: Iterable[str]) -> dict[str, set[str]]:
     packages: dict[str, set[str]] = {}
 
     for line in output:
@@ -34,7 +35,7 @@ def _parse_yum_or_zypper_repositories(output):
             current_repo["name"] = line[1:-1]
 
         if current_repo and "=" in line:
-            key, value = line.split("=", 1)
+            key, value = re.split(r"\s*=\s*", line, maxsplit=1)
             current_repo[key] = value
 
     if current_repo:

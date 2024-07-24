@@ -500,6 +500,57 @@ class TestSSHConnector(TestCase):
             get_pty=False,
         )
 
+    @patch("pyinfra.connectors.util.getpass")
+    @patch("pyinfra.connectors.ssh.SSHClient")
+    def test_run_shell_command_sudo_password_automatic_prompt_with_special_chars_in_password(
+        self,
+        fake_ssh_client,
+        fake_getpass,
+    ):
+        fake_ssh = MagicMock()
+        first_fake_stdout = MagicMock()
+        second_fake_stdout = MagicMock()
+        third_fake_stdout = MagicMock()
+
+        first_fake_stdout.__iter__.return_value = ["sudo: a password is required\r"]
+        second_fake_stdout.__iter__.return_value = ["/tmp/pyinfra-sudo-askpass-XXXXXXXXXXXX"]
+
+        fake_ssh.exec_command.side_effect = [
+            (MagicMock(), first_fake_stdout, MagicMock()),  # command w/o sudo password
+            (MagicMock(), second_fake_stdout, MagicMock()),  # SUDO_ASKPASS_COMMAND
+            (MagicMock(), third_fake_stdout, MagicMock()),  # command with sudo pw
+        ]
+
+        fake_ssh_client.return_value = fake_ssh
+        fake_getpass.return_value = "p@ss'word';"
+
+        inventory = make_inventory(hosts=("somehost",))
+        State(inventory, Config())
+        host = inventory.get_host("somehost")
+        host.connect()
+
+        command = "echo Šablony"
+        first_fake_stdout.channel.recv_exit_status.return_value = 1
+        second_fake_stdout.channel.recv_exit_status.return_value = 0
+        third_fake_stdout.channel.recv_exit_status.return_value = 0
+
+        out = host.run_shell_command(command, _sudo=True, print_output=True)
+        assert len(out) == 2
+
+        status, output = out
+        assert status is True
+
+        fake_ssh.exec_command.assert_any_call(("sudo -H -n sh -c 'echo Šablony'"), get_pty=False)
+
+        fake_ssh.exec_command.assert_called_with(
+            (
+                "env SUDO_ASKPASS=/tmp/pyinfra-sudo-askpass-XXXXXXXXXXXX "
+                """PYINFRA_SUDO_PASSWORD='p@ss'"'"'word'"'"';' """
+                "sudo -H -A -k sh -c 'echo Šablony'"
+            ),
+            get_pty=False,
+        )
+
     # SSH file put/get tests
     #
 
@@ -1003,7 +1054,7 @@ class TestSSHConnector(TestCase):
                 )
 
     @patch("pyinfra.connectors.ssh.SSHClient")
-    @patch("time.sleep")
+    @patch("pyinfra.connectors.ssh.sleep")
     def test_ssh_connect_fail_retry(self, fake_sleep, fake_ssh_client):
         for exception_class in (
             SSHException,
@@ -1011,6 +1062,9 @@ class TestSSHConnector(TestCase):
             socket_error,
             EOFError,
         ):
+            fake_sleep.reset_mock()
+            fake_ssh_client.reset_mock()
+
             inventory = make_inventory(
                 hosts=("unresposivehost",), override_data={"ssh_connect_retries": 1}
             )
@@ -1019,17 +1073,16 @@ class TestSSHConnector(TestCase):
             unresposivehost = inventory.get_host("unresposivehost")
             assert unresposivehost.data.ssh_connect_retries == 1
 
-            fake_ssh = MagicMock()
-            fake_ssh.connect.side_effect = exception_class()
-            fake_ssh_client.return_value = fake_ssh
+            fake_ssh_client().connect.side_effect = exception_class()
 
             with self.assertRaises(ConnectError):
                 unresposivehost.connect(show_errors=False, raise_exceptions=True)
-            assert fake_sleep.called_once()
-            assert fake_ssh_client.connect.called_twice()
+
+            fake_sleep.assert_called_once()
+            assert fake_ssh_client().connect.call_count == 2
 
     @patch("pyinfra.connectors.ssh.SSHClient")
-    @patch("time.sleep")
+    @patch("pyinfra.connectors.ssh.sleep")
     def test_ssh_connect_fail_success(self, fake_sleep, fake_ssh_client):
         for exception_class in (
             SSHException,
@@ -1037,6 +1090,9 @@ class TestSSHConnector(TestCase):
             socket_error,
             EOFError,
         ):
+            fake_sleep.reset_mock()
+            fake_ssh_client.reset_mock()
+
             inventory = make_inventory(
                 hosts=("unresposivehost",), override_data={"ssh_connect_retries": 1}
             )
@@ -1045,11 +1101,8 @@ class TestSSHConnector(TestCase):
             unresposivehost = inventory.get_host("unresposivehost")
             assert unresposivehost.data.ssh_connect_retries == 1
 
-            connection = MagicMock()
-            fake_ssh = MagicMock()
-            fake_ssh.connect.side_effect = [exception_class(), connection]
-            fake_ssh_client.return_value = fake_ssh
+            fake_ssh_client().connect.side_effect = [exception_class(), MagicMock()]
 
             unresposivehost.connect(show_errors=False, raise_exceptions=True)
-            assert fake_sleep.called_once()
-            assert fake_ssh_client.connect.called_twice()
+            fake_sleep.assert_called_once()
+            assert fake_ssh_client().connect.call_count == 2

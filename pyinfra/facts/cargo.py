@@ -1,5 +1,7 @@
 # encoding: utf8
 
+from __future__ import annotations
+
 from pyinfra.api import FactBase
 
 from .util.packaging import parse_packages
@@ -20,10 +22,11 @@ class CargoPackages(FactBase):
 
     default = dict
 
-    requires_command = "cargo"
-
-    def command(self):
+    def command(self) -> str:
         return "cargo install --list"
+
+    def requires_command(self) -> str:
+        return "cargo"
 
     def process(self, output):
         return parse_packages(CARGO_REGEX, output)

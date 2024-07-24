@@ -2,6 +2,8 @@
 The iptables modules handles iptables rules
 """
 
+from __future__ import annotations
+
 from pyinfra import host
 from pyinfra.api import operation
 from pyinfra.api.exceptions import OperationError
@@ -10,10 +12,10 @@ from pyinfra.facts.iptables import Ip6tablesChains, Ip6tablesRules, IptablesChai
 
 @operation()
 def chain(
-    chain,
+    chain: str,
     present=True,
     table="filter",
-    policy=None,
+    policy: str | None = None,
     version=4,
 ):
     """
@@ -58,32 +60,32 @@ def chain(
 
 @operation()
 def rule(
-    chain,
-    jump,
-    present=True,
-    table="filter",
-    append=True,
-    version=4,
+    chain: str,
+    jump: str,
+    present: bool = True,
+    table: str = "filter",
+    append: bool = True,
+    version: int = 4,
     # Core iptables filter arguments
-    protocol=None,
-    not_protocol=None,
-    source=None,
-    not_source=None,
-    destination=None,
-    not_destination=None,
-    in_interface=None,
-    not_in_interface=None,
-    out_interface=None,
-    not_out_interface=None,
+    protocol: str | None = None,
+    not_protocol: str | None = None,
+    source: str | None = None,
+    not_source: str | None = None,
+    destination: str | None = None,
+    not_destination: str | None = None,
+    in_interface: str | None = None,
+    not_in_interface: str | None = None,
+    out_interface: str | None = None,
+    not_out_interface: str | None = None,
     # After-rule arguments
-    to_destination=None,
-    to_source=None,
-    to_ports=None,
-    log_prefix=None,
+    to_destination: str | None = None,
+    to_source: str | None = None,
+    to_ports: int | str | None = None,
+    log_prefix: str | None = None,
     # Extras and extra shortcuts
-    destination_port=None,
-    source_port=None,
-    extras="",
+    destination_port: int | None = None,
+    source_port: int | None = None,
+    extras: str = "",
 ):
     """
     Add/remove iptables rules.

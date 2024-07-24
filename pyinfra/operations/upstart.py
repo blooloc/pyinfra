@@ -2,6 +2,8 @@
 Manage upstart services.
 """
 
+from __future__ import annotations
+
 from io import StringIO
 
 from pyinfra import host
@@ -14,12 +16,12 @@ from .util.service import handle_service_control
 
 @operation()
 def service(
-    service,
+    service: str,
     running=True,
     restarted=False,
     reloaded=False,
-    command=None,
-    enabled=None,
+    command: str | None = None,
+    enabled: bool | None = None,
 ):
     """
     Manage the state of upstart managed services.

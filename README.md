@@ -4,27 +4,21 @@
     </a>
 </p>
 
-<p align="center">
-    <strong>Note: this is the v3 branch, which is currently in beta. <a href="https://docs.pyinfra.com/en/next">See the docs for v3</a>. If needed the <a href="https://github.com/pyinfra-dev/pyinfra/tree/2.x/">2.x branch is here</a>, but is in bugfix only mode.</strong>
-</p>
-
-<p align="center">
-    <em>pyinfra automates infrastructure using Python. It’s fast and scales from one server to thousands. Great for ad-hoc command execution, service deployment, configuration management and more.</em>
+<p>
+    pyinfra turns Python code into shell commands and runs them on your servers. Execute ad-hoc commands and write declarative operations. Target SSH servers, local machine and Docker containers. Fast and scales from one server to thousands. Think <code>ansible</code> but Python instead of YAML, and a lot faster.
 </p>
 
 ---
 
-<p align="center">
-    <a href="https://docs.pyinfra.com"><strong>Documentation</strong></a> &rArr;
+<h3>
     <a href="https://docs.pyinfra.com/page/getting-started.html"><strong>Getting Started</strong></a> &bull;
-    <a href="https://docs.pyinfra.com/page/examples.html"><strong>Examples</strong></a> &bull;
+    <a href="https://github.com/pyinfra-dev/pyinfra-examples"><strong>Examples Repo</strong></a> &bull;
+    <a href="https://matrix.to/#/#pyinfra:matrix.org"><strong>Chat on Matrix</strong></a>
+</h3>
+<p>
+    <a href="https://docs.pyinfra.com"><strong>Documentation</strong></a> &bull;
     <a href="https://docs.pyinfra.com/page/support.html"><strong>Help & Support</strong></a> &bull;
     <a href="https://docs.pyinfra.com/page/contributing.html"><strong>Contributing</strong></a>
-</p>
-
-<p align="center">
-    Chat &rArr;
-    <a href="https://matrix.to/#/#pyinfra:matrix.org"><strong><code>#pyinfra</code> on Matrix</strong></a>
 </p>
 
 ---

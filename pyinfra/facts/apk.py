@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pyinfra.api import FactBase
 
 from .util.packaging import parse_packages
@@ -16,8 +18,11 @@ class ApkPackages(FactBase):
         }
     """
 
-    command = "apk list --installed"
-    requires_command = "apk"
+    def command(self) -> str:
+        return "apk list --installed"
+
+    def requires_command(self) -> str:
+        return "apk"
 
     default = dict
 
