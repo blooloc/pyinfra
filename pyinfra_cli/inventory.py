@@ -1,11 +1,11 @@
 import socket
 from collections import defaultdict
 from os import listdir, path
-from types import GeneratorType
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 from pyinfra import logger
 from pyinfra.api.inventory import Inventory
+from pyinfra.connectors.sshuserclient.client import get_ssh_config
 from pyinfra.context import ctx_inventory
 
 from .exceptions import CliError
@@ -22,18 +22,37 @@ def _is_inventory_group(key: str, value: Any):
     Verify that a module-level variable (key = value) is a valid inventory group.
     """
 
-    if key.startswith("_") or not isinstance(value, (list, tuple, GeneratorType)):
+    if key.startswith("__"):
+        # Ignore __builtins__/__file__
+        return False
+    elif key.startswith("_"):
+        logger.debug(
+            'Ignoring variable "%s" in inventory file since it starts with a leading underscore',
+            key,
+        )
         return False
 
-    # If the group is a tuple of (hosts, data), check the hosts
-    if isinstance(value, tuple):
+    if isinstance(value, list):
+        pass
+    elif isinstance(value, tuple):
+        # If the group is a tuple of (hosts, data), check the hosts
         value = value[0]
+    else:
+        logger.debug(
+            'Ignoring variable "%s" in inventory file since it is not a list or tuple',
+            key,
+        )
+        return False
 
-    # Expand any generators of hosts
-    if isinstance(value, GeneratorType):
-        value = list(value)
+    if not all(isinstance(item, ALLOWED_HOST_TYPES) for item in value):
+        logger.warning(
+            'Ignoring host group "%s". '
+            "Host groups may only contain strings (host) or tuples (host, data).",
+            key,
+        )
+        return False
 
-    return all(isinstance(item, ALLOWED_HOST_TYPES) for item in value)
+    return True
 
 
 def _get_group_data(dirname_or_filename: str):
@@ -88,7 +107,34 @@ def _resolves_to_host(maybe_host: str) -> bool:
         socket.getaddrinfo(maybe_host, port=None)
         return True
     except socket.gaierror:
-        return False
+        alias = _get_ssh_alias(maybe_host)
+        if not alias:
+            return False
+
+        try:
+            socket.getaddrinfo(alias, port=None)
+            return True
+        except socket.gaierror:
+            return False
+
+
+def _get_ssh_alias(maybe_host: str) -> Optional[str]:
+    logger.debug('Checking if "%s" is an SSH alias', maybe_host)
+
+    # Note this does not cover the case where `host.data.ssh_config_file` is used
+    ssh_config = get_ssh_config()
+
+    if ssh_config is None:
+        logger.debug("Could not load SSH config")
+        return None
+
+    options = ssh_config.lookup(maybe_host)
+    alias = options.get("hostname")
+
+    if alias is None or maybe_host == alias:
+        return None
+
+    return alias
 
 
 def make_inventory(
@@ -105,7 +151,11 @@ def make_inventory(
     # (1) an inventory file is a common use case and (2) no other option can have a comma or an @
     # symbol in them.
     is_path_or_host_list_or_connector = (
-        path.exists(inventory) or "," in inventory or "@" in inventory
+        path.exists(inventory)
+        or "," in inventory
+        or "@" in inventory
+        # Special case: passing an arbitrary name and specifying --data ssh_hostname=a.b.c
+        or (override_data is not None and "ssh_hostname" in override_data)
     )
     if not is_path_or_host_list_or_connector:
         # Next, try loading the inventory from a python function. This happens before checking for a
@@ -226,7 +276,6 @@ def make_inventory_from_files(
         for hosts in groups.values():
             # Groups can be a list of hosts or tuple of (hosts, data)
             hosts = _get_any_tuple_first(hosts)
-
             for host in hosts:
                 # Hosts can be a hostname or tuple of (hostname, data)
                 hostname = _get_any_tuple_first(host)

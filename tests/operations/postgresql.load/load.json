@@ -1,15 +1,15 @@
 {
     "args": ["somefile"],
     "kwargs": {
-        "database": "somedb",
         "psql_user": "root",
-        "psql_password": "somepass"
+        "psql_password": "somepass",
+        "psql_database": "somedb"
     },
     "commands": [
-        [
-            "PGPASSWORD=\"somepass\" psql -d somedb -U root < somefile",
-            "*** psql -d somedb -U root < somefile"
-        ]
+        {
+            "raw": "PGPASSWORD=\"somepass\" psql -d somedb -U root < somefile",
+            "masked": "*** psql -d somedb -U root < somefile"
+        }
     ],
     "idempotent": false
 }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing_extensions import override
+
 from pyinfra.api import FactBase, MaskString, QuoteString, StringCommand
 from pyinfra.api.util import try_int
 
@@ -49,16 +51,18 @@ class PostgresFactBase(FactBase):
 
     psql_command: str
 
+    @override
     def requires_command(self, *args, **kwargs):
         return "psql"
 
+    @override
     def command(
         self,
         psql_user=None,
         psql_password=None,
         psql_host=None,
         psql_port=None,
-        database=None
+        psql_database=None,
     ):
         return make_execute_psql_command(
             self.psql_command,
@@ -66,7 +70,7 @@ class PostgresFactBase(FactBase):
             password=psql_password,
             host=psql_host,
             port=psql_port,
-            database=database
+            database=psql_database,
         )
 
 
@@ -89,6 +93,7 @@ class PostgresRoles(PostgresFactBase):
     default = dict
     psql_command = "SELECT * FROM pg_catalog.pg_roles"
 
+    @override
     def process(self, output):
         # Remove the last line of the output (row count)
         output = output[:-1]
@@ -139,8 +144,9 @@ class PostgresDatabases(PostgresFactBase):
     """
 
     default = dict
-    psql_command = "SELECT pg_catalog.pg_encoding_to_char(encoding), * FROM pg_catalog.pg_database"
+    psql_command = "SELECT pg_catalog.pg_encoding_to_char(encoding), *, pg_catalog.pg_get_userbyid(datdba) AS owner FROM pg_catalog.pg_database"  # noqa: E501
 
+    @override
     def process(self, output):
         # Remove the last line of the output (row count)
         output = output[:-1]
@@ -155,7 +161,7 @@ class PostgresDatabases(PostgresFactBase):
 
         for details in rows:
             details["encoding"] = details.pop("pg_encoding_to_char")
-
+            details["owner"] = details.pop("owner")
             for key, value in list(details.items()):
                 if key.endswith("id") or key in (
                     "dba",

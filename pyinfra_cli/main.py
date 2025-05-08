@@ -34,7 +34,7 @@ from .util import exec_file, load_deploy_file, load_func, parse_cli_arg
 from .virtualenv import init_virtualenv
 
 
-def _exit():
+def _exit() -> None:
     if ctx_state.isset() and state.failed_hosts:
         sys.exit(1)
     sys.exit(0)
@@ -49,7 +49,10 @@ def _print_support(ctx, param, value):
     ctx.exit()
 
 
-@click.command()
+CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
+
+
+@click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("inventory", nargs=1, type=click.Path(exists=False))
 @click.argument("operations", nargs=-1, required=True, type=click.Path(exists=False))
 @click.option(
@@ -347,7 +350,6 @@ def _main(
     state.set_stage(StateStage.Connect)
     connect_all(state)
 
-    logger.info("--> Preparing operations...")
     state.set_stage(StateStage.Prepare)
     can_diff, state, config = _handle_commands(
         state, config, command, original_operations, operations
@@ -361,6 +363,14 @@ def _main(
         else:
             logger.info("--> Detected changes:")
             print_meta(state)
+            click.echo(
+                """
+    Detected changes may not include every change pyinfra will execute.
+    Hidden side effects of operations may alter behaviour of future operations,
+    this will be shown in the results. The remote state will always be updated
+    to reflect the state defined by the input operations.""",
+                err=True,
+            )
 
     # If --debug-facts or --debug-operations, print and exit
     if debug_facts or debug_operations:
@@ -372,14 +382,6 @@ def _main(
     if dry:
         _exit()
 
-    click.echo(
-        """
-    Detected changes may not include every change pyinfra will execute.
-    Hidden side effects of operations may alter behaviour of future operations,
-    this will be shown in the results. The remote state will always be updated
-    to reflect the state defined by the input operations.""",
-        err=True,
-    )
     if (
         can_diff
         and not yes
@@ -648,6 +650,7 @@ def _apply_inventory_limit(inventory, limit):
 #
 def _handle_commands(state, config, command, original_operations, operations):
     if command is CliCommands.FACT:
+        logger.info("--> Gathering facts...")
         state, fact_data = _run_fact_operations(state, config, operations)
         print_facts(fact_data)
         _exit()
@@ -655,13 +658,16 @@ def _handle_commands(state, config, command, original_operations, operations):
     can_diff = True
 
     if command == CliCommands.SHELL:
+        logger.info("--> Preparing exec operation...")
         state = _prepare_exec_operations(state, config, operations)
         can_diff = False
 
     elif command == CliCommands.DEPLOY_FILES:
+        logger.info("--> Preparing operation files...")
         state, config, operations = _prepare_deploy_operations(state, config, operations)
 
     elif command == CliCommands.FUNC:
+        logger.info("--> Preparing operation func...")
         state, kwargs = _prepare_func_operations(
             state,
             config,
@@ -673,8 +679,6 @@ def _handle_commands(state, config, command, original_operations, operations):
 
 
 def _run_fact_operations(state, config, operations):
-    logger.info("--> Gathering facts...")
-
     state.print_fact_info = True
     fact_data = {}
 
@@ -712,7 +716,6 @@ def _prepare_exec_operations(state, config, operations):
 
 
 def _prepare_deploy_operations(state, config, operations):
-    logger.info("--> Preparing Operations...")
 
     # Number of "steps" to make = number of files * number of hosts
     for i, filename in enumerate(operations):
@@ -729,8 +732,6 @@ def _prepare_deploy_operations(state, config, operations):
 
 
 def _prepare_func_operations(state, config, operations, original_operations):
-    logger.info("--> Preparing operation...")
-
     op, args = operations
     args, kwargs = args
 

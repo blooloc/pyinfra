@@ -33,32 +33,38 @@ class TestCliDeployState(PatchSSHTestCase):
             assert list(op_meta.names)[0] == correct_op_name
 
             for host in state.inventory:
+                executed = False
+                host_op = state.ops[host].get(op_hash)
+                if host_op:
+                    executed = host_op.operation_meta.executed
                 if correct_host_names is True or host.name in correct_host_names:
-                    self.assertIn(op_hash, host.op_hash_order)
+                    assert executed is True
                 else:
-                    self.assertNotIn(op_hash, host.op_hash_order)
+                    assert executed is False
 
     def test_deploy(self):
-        task_file_path = path.join("tasks", "a_task.py")
+        a_task_file_path = path.join("tasks", "a_task.py")
+        b_task_file_path = path.join("tasks", "b_task.py")
         nested_task_path = path.join("tasks", "another_task.py")
         correct_op_name_and_host_names = [
             ("First main operation", True),  # true for all hosts
             ("Second main operation", ("somehost",)),
-            ("{0} | First task operation".format(task_file_path), ("anotherhost",)),
-            ("{0} | Task order loop 1".format(task_file_path), ("anotherhost",)),
-            ("{0} | 2nd Task order loop 1".format(task_file_path), ("anotherhost",)),
-            ("{0} | Task order loop 2".format(task_file_path), ("anotherhost",)),
-            ("{0} | 2nd Task order loop 2".format(task_file_path), ("anotherhost",)),
+            ("{0} | First task operation".format(a_task_file_path), ("anotherhost",)),
+            ("{0} | Task order loop 1".format(a_task_file_path), ("anotherhost",)),
+            ("{0} | 2nd Task order loop 1".format(a_task_file_path), ("anotherhost",)),
+            ("{0} | Task order loop 2".format(a_task_file_path), ("anotherhost",)),
+            ("{0} | 2nd Task order loop 2".format(a_task_file_path), ("anotherhost",)),
             (
-                "{0} | {1} | Second task operation".format(task_file_path, nested_task_path),
+                "{0} | {1} | Second task operation".format(a_task_file_path, nested_task_path),
                 ("anotherhost",),
             ),
-            ("{0} | First task operation".format(task_file_path), True),
-            ("{0} | Task order loop 1".format(task_file_path), True),
-            ("{0} | 2nd Task order loop 1".format(task_file_path), True),
-            ("{0} | Task order loop 2".format(task_file_path), True),
-            ("{0} | 2nd Task order loop 2".format(task_file_path), True),
-            ("{0} | {1} | Second task operation".format(task_file_path, nested_task_path), True),
+            ("{0} | First task operation".format(a_task_file_path), True),
+            ("{0} | Task order loop 1".format(a_task_file_path), True),
+            ("{0} | 2nd Task order loop 1".format(a_task_file_path), True),
+            ("{0} | Task order loop 2".format(a_task_file_path), True),
+            ("{0} | 2nd Task order loop 2".format(a_task_file_path), True),
+            ("{0} | {1} | Second task operation".format(a_task_file_path, nested_task_path), True),
+            ("{0} | Important task operation".format(b_task_file_path), True),
             ("My deploy | First deploy operation", True),
             ("My deploy | My nested deploy | First nested deploy operation", True),
             ("My deploy | Second deploy operation", True),
@@ -72,6 +78,7 @@ class TestCliDeployState(PatchSSHTestCase):
             ("Nested order loop 2/1", ("somehost", "anotherhost")),
             ("Nested order loop 2/2", ("somehost", "anotherhost")),
             ("Final limited operation", ("somehost",)),
+            ("Second final limited operation", ("anotherhost", "someotherhost")),
         ]
 
         # Run 3 iterations of the test - each time shuffling the order of the

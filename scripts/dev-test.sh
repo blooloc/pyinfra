@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
-pytest
+echo "Execute pytest..."
+pytest $@
+
+echo "Tests complete!"

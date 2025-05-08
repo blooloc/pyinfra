@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from pyinfra.api.state import State
 
 
-def add_deploy(state: "State", deploy_func: Callable[..., Any], *args, **kwargs):
+def add_deploy(state: "State", deploy_func: Callable[..., Any], *args, **kwargs) -> None:
     """
     Prepare & add an deploy to pyinfra.state by executing it on all hosts.
 
@@ -54,11 +54,21 @@ def add_deploy(state: "State", deploy_func: Callable[..., Any], *args, **kwargs)
 P = ParamSpec("P")
 
 
-def deploy(name: Optional[str] = None, data_defaults=None):
+def deploy(
+    name: Optional[str] = None, data_defaults: Optional[dict] = None
+) -> Callable[[Callable[P, Any]], PyinfraOperation[P]]:
     """
     Decorator that takes a deploy function (normally from a pyinfra_* package)
     and wraps any operations called inside with any deploy-wide kwargs/data.
     """
+
+    if name and not isinstance(name, str):
+        raise PyinfraError(
+            (
+                "The `deploy` decorator must be called, ie `@deploy()`, "
+                "see: https://docs.pyinfra.com/en/3.x/compatibility.html#upgrading-pyinfra-from-2-x-3-x"  # noqa
+            )
+        )
 
     def decorator(func: Callable[P, Any]) -> PyinfraOperation[P]:
         func.deploy_name = name or func.__name__  # type: ignore[attr-defined]

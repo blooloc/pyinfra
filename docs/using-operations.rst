@@ -1,7 +1,10 @@
 Using Operations
 ================
 
-Operations tell pyinfra what to do, for example the ``server.shell`` operation instructs pyinfra to execute a shell command. Most operations define state rather than actions - so instead of "start this service" you say "this service should be running" - pyinfra will make changes if needed.
+.. admonition:: What are operations?
+    :class: tip
+
+    Operations tell pyinfra what to do, for example the ``server.shell`` operation instructs pyinfra to execute a shell command. Most operations define state rather than actions - so instead of *start this service* you say *this service should be running* - pyinfra will make changes if needed.
 
 For example, these two operations will ensure that user ``pyinfra`` exists with home directory ``/home/pyinfra``, and that the ``/var/log/pyinfra.log`` file exists and is owned by that user:
 
@@ -105,6 +108,15 @@ See :doc:`facts` for a full list of available facts and arguments.
 .. Important::
     Only use immutable facts in deploy code (installed OS, Arch, etc) unless you are absolutely sure they will not change. See: `using host facts <deploy-process.html#using-host-facts>`_.
 
+Fact Errors
+~~~~~~~~~~~
+
+When facts fail due to an error the host will be marked as failed just as it would when an operation fails. This can be avoided by passing the ``_ignore_errors`` argument:
+
+.. code:: python
+
+    if host.get_fact(LinuxName, _ignore_errors=True):
+        ...
 
 The ``inventory`` Object
 ------------------------
@@ -143,11 +155,33 @@ All operations return an operation meta object which provides information about 
         user="myuser",
     )
 
-    server.shell(
-        name="Bootstrap user",
-        commands=["..."],
-        _if=create_user,
+    create_otheruser = server.user(
+        name="Create user otheruser",
+        user="otheruser",
     )
+
+    server.shell(
+        name="Bootstrap myuser",
+        commands=["..."],
+        _if=create_user.did_change,
+    )
+
+    # A list can be provided to run an operation if **all** functions return true
+    server.shell(
+        commands=["echo 'Both myuser and otheruser changed'"],
+        _if=[create_user.did_change, create_otheruser.did_change],
+    )
+
+    # You can also build your own lamba functions to achieve, e.g. an OR condition
+    server.shell(
+        commands=["echo 'myuser or otheruser changed'"],
+        _if=lambda: create_user.did_change() or create_otheruser.did_change(),
+    )
+
+    # The functions `any_changed` and `all_changed` are provided for common use cases, e.g.
+    from pyinfra.operations.util import any_changed, all_changed
+    server.shell(commands=["..."], _if=any_changed(create_user, create_otheruser))
+    server.shell(commands=["..."], _if=all_changed(create_user, create_otheruser))
 
 Operation Output
 ~~~~~~~~~~~~~~~~
@@ -171,6 +205,24 @@ pyinfra doesn't immediately execute operations, meaning output is not available 
         name="Execute callback function",
         function=callback,
     )
+
+
+There is also the possibility to use pyinfra's logging functionality which may be appropriate in certain situations.
+
+.. code:: python
+
+    from pyinfra import logger
+    def ufw_usable(function code here)
+    is_ufw_usable = ufw_usable()
+    logger.info('Checking output of ufw_usable: {}'.format(is_ufw_usable))
+
+
+Produces output similar to:
+    --> Preparing Operations...
+        Loading: deploy_create_users.py
+        Checking output of ufw_usable: None
+        [multitest.example.com] Ready: deploy_create_users.py
+
 
 
 Nested Operations
@@ -209,6 +261,37 @@ Including files can be used to break out operations across multiple files. Files
 
     # Include & call all the operations in tasks/install_something.py
     local.include("tasks/install_something.py")
+
+Additional data can be passed across files via the ``data`` param to parameterize tasks and is available in ``host.data``. For example `tasks/create_user.py` could look like:
+
+.. code:: python
+
+    from getpass import getpass
+
+    from pyinfra import host
+    from pyinfra.operations import server
+
+    group = host.data.get("group")
+    user = host.data.get("user")
+
+    server.group(
+        name=f"Ensure {group} is present",
+        group=group,
+    )
+    server.user(
+        name=f"Ensure {user} is present",
+        user=user,
+        group=group,
+    )
+
+And and be called by other deploy scripts or tasks:
+
+.. code:: python
+
+    from pyinfra import local
+
+    for group, user in (("admin", "Bob"), ("admin", "Joe")):
+        local.include("tasks/create_user.py", data={"group": group, "user": user})
 
 See more in :doc:`examples: groups & roles <./examples/groups_roles>`.
 

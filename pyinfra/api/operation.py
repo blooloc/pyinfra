@@ -13,7 +13,7 @@ from io import StringIO
 from types import FunctionType
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterator, Optional, cast
 
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, override
 
 import pyinfra
 from pyinfra import context, logger
@@ -52,6 +52,7 @@ class OperationMeta:
         self._hash = hash
         self._maybe_is_change = is_change
 
+    @override
     def __repr__(self) -> str:
         """
         Return Operation object as a string.
@@ -60,7 +61,7 @@ class OperationMeta:
         if self._commands is not None:
             return (
                 "OperationMeta(executed=True, "
-                f"success={self.did_succeed}, hash={self._hash}, commands={len(self._commands)})"
+                f"success={self.did_succeed()}, hash={self._hash}, commands={len(self._commands)})"
             )
         return (
             "OperationMeta(executed=False, "
@@ -88,6 +89,12 @@ class OperationMeta:
             raise RuntimeError("Cannot evaluate operation result before execution")
 
     @property
+    def executed(self) -> bool:
+        if self._commands is None:
+            return False
+        return len(self._commands) > 0
+
+    @property
     def will_change(self) -> bool:
         if self._maybe_is_change is not None:
             return self._maybe_is_change
@@ -100,16 +107,12 @@ class OperationMeta:
         self._maybe_is_change = False
         return False
 
-    def _did_change(self) -> bool:
+    def did_change(self) -> bool:
+        self._raise_if_not_complete()
         return bool(self._success and len(self._commands or []) > 0)
 
-    @property
-    def did_change(self):
-        return context.host.when(self._did_change)
-
-    @property
-    def did_not_change(self):
-        return context.host.when(lambda: not self._did_change())
+    def did_not_change(self) -> bool:
+        return not self.did_change()
 
     def did_succeed(self, _raise_if_not_complete=True) -> bool:
         if _raise_if_not_complete:
@@ -124,7 +127,7 @@ class OperationMeta:
     @property
     def changed(self) -> bool:
         if self.is_complete():
-            return self._did_change()
+            return self.did_change()
         return self.will_change
 
     @property

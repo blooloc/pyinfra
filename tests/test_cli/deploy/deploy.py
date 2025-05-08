@@ -47,6 +47,9 @@ elif host.name == "anotherhost":
 # Include the whole file again, but for all hosts
 local.include(path.join("tasks", "a_task.py"))
 
+# Include a deploy file, with custom specified data
+local.include(path.join("tasks", "b_task.py"), data={"keyword": "Important", "id": 1})
+
 # Execute the @deploy function
 my_deploy()
 
@@ -78,4 +81,10 @@ if host.name == "somehost":
         src="templates/a_template.j2",
         dest="/a_template",
         is_template=True,
+    )
+
+with host.when(lambda: host.name != "somehost"):
+    server.shell(
+        name="Second final limited operation",
+        commands="echo final_limited_op",
     )

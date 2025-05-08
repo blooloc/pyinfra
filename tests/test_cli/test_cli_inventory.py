@@ -64,3 +64,56 @@ class TestCliInventory(PatchSSHTestCase):
         assert "leftover_data" in inventory.group_data
         assert inventory.group_data["leftover_data"].get("still_parsed") == "never_used"
         assert inventory.group_data["leftover_data"].get("_global_arg") == "gets_parsed"
+
+    def test_ignores_variables_with_leading_underscore(self):
+        ctx_state.reset()
+        ctx_inventory.reset()
+
+        result = run_cli(
+            path.join("tests", "test_cli", "inventories", "invalid.py"),
+            "exec",
+            "--debug",
+            "--",
+            "echo hi",
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert (
+            'Ignoring variable "_hosts" in inventory file since it starts with a leading underscore'
+            in result.stdout
+        )
+        assert inventory.hosts == {}
+
+    def test_only_supports_list_and_tuples(self):
+        ctx_state.reset()
+        ctx_inventory.reset()
+
+        result = run_cli(
+            path.join("tests", "test_cli", "inventories", "invalid.py"),
+            "exec",
+            "--debug",
+            "--",
+            "echo hi",
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert 'Ignoring variable "dict_hosts" in inventory file' in result.stdout, result.stdout
+        assert (
+            'Ignoring variable "generator_hosts" in inventory file' in result.stdout
+        ), result.stdout
+        assert inventory.hosts == {}
+
+    def test_host_groups_may_only_contain_strings_or_tuples(self):
+        ctx_state.reset()
+        ctx_inventory.reset()
+
+        result = run_cli(
+            path.join("tests", "test_cli", "inventories", "invalid.py"),
+            "exec",
+            "--",
+            "echo hi",
+        )
+
+        assert result.exit_code == 0, result.stdout
+        assert 'Ignoring host group "issue_662"' in result.stdout, result.stdout
+        assert inventory.hosts == {}

@@ -130,7 +130,11 @@ def print_facts(facts):
         print_fact(data)
 
 
-def print_support_info():
+def print_support_info() -> None:
+    from importlib.metadata import PackageNotFoundError, requires, version
+
+    from packaging.requirements import Requirement
+
     click.echo(
         """
     If you are having issues with pyinfra or wish to make feature requests, please
@@ -144,6 +148,18 @@ def print_support_info():
     click.echo("      Release: {0}".format(platform.uname()[2]), err=True)
     click.echo("      Machine: {0}".format(platform.uname()[4]), err=True)
     click.echo("    pyinfra: v{0}".format(__version__), err=True)
+
+    for requirement_string in sorted(requires("pyinfra") or []):
+        requirement = Requirement(requirement_string)
+        try:
+            click.echo(
+                "      {0}: v{1}".format(requirement.name, version(requirement.name)),
+                err=True,
+            )
+        except PackageNotFoundError:
+            # package not installed in this environment
+            continue
+
     click.echo("    Executable: {0}".format(sys.argv[0]), err=True)
     click.echo(
         "    Python: {0} ({1}, {2})".format(
@@ -265,6 +281,8 @@ def print_results(state: "State"):
         (logger.info, ["Operation", "Hosts", "Success", "Error", "No Change"]),
     ]
 
+    totals = {"hosts": 0, "success": 0, "error": 0, "no_change": 0}
+
     for op_hash in state.get_op_order():
         hosts_in_op = 0
         hosts_in_op_success: list[str] = []
@@ -278,7 +296,7 @@ def print_results(state: "State"):
 
             op_meta = state.ops[host][op_hash].operation_meta
             if op_meta.did_succeed(_raise_if_not_complete=False):
-                if op_meta._did_change():
+                if op_meta.did_change():
                     hosts_in_op_success.append(host.name)
                 else:
                     hosts_in_op_no_change.append(host.name)
@@ -290,19 +308,32 @@ def print_results(state: "State"):
             str(hosts_in_op),
         ]
 
+        totals["hosts"] += hosts_in_op
+
         if hosts_in_op_success:
-            row.append(f"{len(hosts_in_op_success)}")
+            num_hosts_in_op_success = len(hosts_in_op_success)
+            row.append(str(num_hosts_in_op_success))
+            totals["success"] += num_hosts_in_op_success
         else:
             row.append("-")
+
         if hosts_in_op_error:
-            row.append(f"{len(hosts_in_op_error)}")
+            num_hosts_in_op_error = len(hosts_in_op_error)
+            row.append(str(num_hosts_in_op_error))
+            totals["error"] += num_hosts_in_op_error
         else:
             row.append("-")
+
         if hosts_in_op_no_change:
-            row.append(f"{len(hosts_in_op_no_change)}")
+            num_hosts_in_op_no_change = len(hosts_in_op_no_change)
+            row.append(str(num_hosts_in_op_no_change))
+            totals["no_change"] += num_hosts_in_op_no_change
         else:
             row.append("-")
 
         rows.append((logger.info, row))
+
+    totals_row = ["Grand total"] + [str(i) if i else "-" for i in totals.values()]
+    rows.append((logger.info, totals_row))
 
     print_rows(rows)

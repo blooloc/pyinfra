@@ -1,7 +1,8 @@
+from base64 import b64decode
 from unittest import TestCase
 from unittest.mock import mock_open, patch
 
-from paramiko import ProxyCommand
+from paramiko import PKey, ProxyCommand, SSHException
 
 from pyinfra.connectors.sshuserclient import SSHClient
 from pyinfra.connectors.sshuserclient.client import AskPolicy, get_ssh_config
@@ -41,6 +42,30 @@ LOOPING_SSH_CONFIG_DATA = """
 Include other_file
 """
 
+# To ensure that we don't remove things from users hostfiles
+# we should test that all modifications only append to the
+# hostfile, and don't delete any data or comments.
+EXAMPLE_KEY_1 = (
+    "AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+"
+    "VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/"
+    "C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXk"
+    "E2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMj"
+    "A2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIE"
+    "s4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+Ej"
+    "qoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/Wnw"
+    "H6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
+)
+
+KNOWN_HOSTS_EXAMPLE_DATA = f"""
+# this is an important comment
+
+# another comment after the newline
+
+@cert-authority example-domain.lan ssh-rsa {EXAMPLE_KEY_1}
+
+192.168.1.222 ssh-rsa {EXAMPLE_KEY_1}
+"""
+
 
 class TestSSHUserConfigMissing(TestCase):
     def setUp(self):
@@ -53,8 +78,10 @@ class TestSSHUserConfigMissing(TestCase):
     def test_load_ssh_config_no_exist(self):
         client = SSHClient()
 
-        _, config, forward_agent, missing_host_key_policy, host_keys_file = client.parse_config(
-            "127.0.0.1",
+        _, config, forward_agent, missing_host_key_policy, host_keys_file, keep_alive = (
+            client.parse_config(
+                "127.0.0.1",
+            )
         )
 
         assert config.get("port") == 22
@@ -101,8 +128,10 @@ class TestSSHUserConfig(TestCase):
     def test_load_ssh_config(self):
         client = SSHClient()
 
-        _, config, forward_agent, missing_host_key_policy, host_keys_file = client.parse_config(
-            "127.0.0.1",
+        _, config, forward_agent, missing_host_key_policy, host_keys_file, keep_alive = (
+            client.parse_config(
+                "127.0.0.1",
+            )
         )
 
         assert config.get("key_filename") == ["/id_rsa", "/id_rsa2"]
@@ -119,6 +148,7 @@ class TestSSHUserConfig(TestCase):
             forward_agent,
             missing_host_key_policy,
             host_keys_file,
+            keep_alive,
         ) = client.parse_config("192.168.1.1")
 
         assert other_config.get("username") == "otheruser"
@@ -173,7 +203,7 @@ class TestSSHUserConfig(TestCase):
         client = SSHClient()
 
         # Load the SSH config with ProxyJump configured
-        _, config, forward_agent, _, _ = client.parse_config(
+        _, config, forward_agent, _, _, _ = client.parse_config(
             "192.168.1.2",
             {"port": 1022},
             ssh_config_file="other_file",
@@ -199,3 +229,45 @@ class TestSSHUserConfig(TestCase):
             port=22,
             test="kwarg",
         )
+
+    def test_missing_hostkey(self):
+        client = SSHClient()
+        policy = AskPolicy()
+        example_hostname = "new_host"
+        example_keytype = "ecdsa-sha2-nistp256"
+        example_key = (
+            "AAAAE2VjZHNhLXNoYTItbmlzdHAyNT"
+            "YAAAAIbmlzdHAyNTYAAABBBHNp1NM"
+            "ZjxPBuuKwIPfkVJqWaH3oUtW137kIW"
+            "P4PlCyACt8zVIIimFhIpwRUidcf7jw"
+            "VWPAJvfBjEPqewDApnZQ="
+        )
+
+        key = PKey.from_type_string(
+            example_keytype,
+            b64decode(example_key),
+        )
+
+        # Check if AskPolicy respects not importing and properly raises SSHException
+        with self.subTest("Check user 'no'"):
+            with patch("builtins.input", return_value="n"):
+                self.assertRaises(
+                    SSHException, lambda: policy.missing_host_key(client, example_hostname, key)
+                )
+
+        # Check if AskPolicy properly appends to hostfile
+        with self.subTest("Check user 'yes'"):
+            mock_data = mock_open(read_data=KNOWN_HOSTS_EXAMPLE_DATA)
+            # Read mock hostfile
+            with patch("pyinfra.connectors.sshuserclient.client.open", mock_data):
+                with patch("paramiko.hostkeys.open", mock_data):
+                    with patch("builtins.input", return_value="y"):
+                        policy.missing_host_key(client, "new_host", key)
+
+            # Assert that we appended correctly to the file
+            write_call_args = mock_data.return_value.write.call_args
+            # Ensure we only wrote once and then closed the handle.
+            assert len(write_call_args) == 2
+            # Ensure we wrote the correct content
+            correct_output = f"{example_hostname} {example_keytype} {example_key}\n"
+            assert write_call_args[0][0] == correct_output

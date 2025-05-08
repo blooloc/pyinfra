@@ -8,6 +8,7 @@ All operations in this module take four optional arguments:
     + ``psql_password``: the password for the connecting user
     + ``psql_host``: the hostname of the server to connect to
     + ``psql_port``: the port of the server to connect to
+    + ``psql_database``: the database on the server to connect to
 
 See example/postgresql.py for detailed example
 
@@ -16,7 +17,7 @@ See example/postgresql.py for detailed example
 from __future__ import annotations
 
 from pyinfra import host
-from pyinfra.api import MaskString, StringCommand, operation
+from pyinfra.api import MaskString, QuoteString, StringCommand, operation
 from pyinfra.facts.postgres import (
     PostgresDatabases,
     PostgresRoles,
@@ -28,48 +29,48 @@ from pyinfra.facts.postgres import (
 @operation(is_idempotent=False)
 def sql(
     sql: str,
-    database: str | None = None,
     # Details for speaking to PostgreSQL via `psql` CLI
     psql_user: str | None = None,
     psql_password: str | None = None,
     psql_host: str | None = None,
     psql_port: int | None = None,
+    psql_database: str | None = None,
 ):
     """
     Execute arbitrary SQL against PostgreSQL.
 
     + sql: SQL command(s) to execute
-    + database: optional database to execute against
     + psql_*: global module arguments, see above
     """
 
     yield make_execute_psql_command(
         sql,
-        database=database,
         user=psql_user,
         password=psql_password,
         host=psql_host,
         port=psql_port,
+        database=psql_database,
     )
 
 
 @operation()
 def role(
     role: str,
-    present=True,
+    present: bool = True,
     password: str | None = None,
-    login=True,
-    superuser=False,
-    inherit=False,
-    createdb=False,
-    createrole=False,
-    replication=False,
+    login: bool = True,
+    superuser: bool = False,
+    inherit: bool = False,
+    createdb: bool = False,
+    createrole: bool = False,
+    replication: bool = False,
     connection_limit: int | None = None,
     # Details for speaking to PostgreSQL via `psql` CLI
     psql_user: str | None = None,
     psql_password: str | None = None,
     psql_host: str | None = None,
     psql_port: int | None = None,
+    psql_database: str | None = None,
 ):
     """
     Add/remove PostgreSQL roles.
@@ -101,7 +102,7 @@ def role(
             password="somepassword",
             superuser=True,
             login=True,
-            sudo_user="postgres",
+            _sudo_user="postgres",
         )
 
     """
@@ -112,6 +113,7 @@ def role(
         psql_password=psql_password,
         psql_host=psql_host,
         psql_port=psql_port,
+        psql_database=psql_database,
     )
 
     is_present = role in roles
@@ -125,6 +127,7 @@ def role(
                 password=psql_password,
                 host=psql_host,
                 port=psql_port,
+                database=psql_database,
             )
         else:
             host.noop("postgresql role {0} does not exist".format(role))
@@ -157,9 +160,50 @@ def role(
             password=psql_password,
             host=psql_host,
             port=psql_port,
+            database=psql_database,
         )
     else:
-        host.noop("postgresql role {0} exists".format(role))
+        # Check if any attributes need updating
+        current_role = roles[role]
+        should_execute = False
+        sql_bits = ['ALTER ROLE "{0}"'.format(role)]
+        if login and "login" in current_role and current_role["login"] != login:
+            sql_bits.append("LOGIN")
+            should_execute = True
+        if superuser and "superuser" in current_role and current_role["superuser"] != superuser:
+            sql_bits.append("SUPERUSER")
+            should_execute = True
+        if inherit and "inherit" in current_role and current_role["inherit"] != inherit:
+            sql_bits.append("INHERIT")
+            should_execute = True
+        if createdb and "createdb" in current_role and current_role["createdb"] != createdb:
+            sql_bits.append("CREATEDB")
+            should_execute = True
+        if createrole and "createrole" in current_role and current_role["createrole"] != createrole:
+            sql_bits.append("CREATEROLE")
+            should_execute = True
+        if (
+            connection_limit
+            and "connection_limit" in current_role
+            and roles[role]["connection_limit"] != connection_limit
+        ):
+            sql_bits.append("CONNECTION LIMIT {0}".format(connection_limit))
+            should_execute = True
+        if password:
+            sql_bits.append(MaskString("PASSWORD '{0}'".format(password)))
+            should_execute = True
+
+        if should_execute:
+            yield make_execute_psql_command(
+                StringCommand(*sql_bits),
+                user=psql_user,
+                password=psql_password,
+                host=psql_host,
+                port=psql_port,
+                database=psql_database,
+            )
+        else:
+            host.noop("postgresql role {0} exists and does not need updates".format(role))
 
 
 @operation()
@@ -178,6 +222,7 @@ def database(
     psql_password: str | None = None,
     psql_host: str | None = None,
     psql_port: int | None = None,
+    psql_database: str | None = None,
 ):
     """
     Add/remove PostgreSQL databases.
@@ -194,9 +239,8 @@ def database(
     + psql_*: global module arguments, see above
 
     Updates:
-        pyinfra will not attempt to change existing databases - it will either
-        create or drop databases, but not alter them (if the db exists this
-        operation will make no changes).
+        pyinfra will change existing databases - but some parameters are not
+        changeable (template, encoding, lc_collate and lc_ctype).
 
     **Example:**
 
@@ -207,7 +251,7 @@ def database(
             database="pyinfra_stuff",
             owner="pyinfra",
             encoding="UTF8",
-            sudo_user="postgres",
+            _sudo_user="postgres",
         )
 
     """
@@ -218,6 +262,7 @@ def database(
         psql_password=psql_password,
         psql_host=psql_host,
         psql_port=psql_port,
+        psql_database=psql_database,
     )
 
     is_present = database in current_databases
@@ -230,6 +275,7 @@ def database(
                 password=psql_password,
                 host=psql_host,
                 port=psql_port,
+                database=psql_database,
             )
         else:
             host.noop("postgresql database {0} does not exist".format(database))
@@ -243,8 +289,8 @@ def database(
             ("OWNER", '"{0}"'.format(owner) if owner else owner),
             ("TEMPLATE", template),
             ("ENCODING", encoding),
-            ("LC_COLLATE", lc_collate),
-            ("LC_CTYPE", lc_ctype),
+            ("LC_COLLATE", "'{0}'".format(lc_collate) if lc_collate else lc_collate),
+            ("LC_CTYPE", "'{0}'".format(lc_ctype) if lc_ctype else lc_ctype),
             ("TABLESPACE", tablespace),
             ("CONNECTION LIMIT", connection_limit),
         ):
@@ -257,26 +303,70 @@ def database(
             password=psql_password,
             host=psql_host,
             port=psql_port,
+            database=psql_database,
         )
     else:
-        host.noop("postgresql database {0} exists".format(database))
+        current_db = current_databases[database]
+
+        for key, value, current_value in (
+            ("TEMPLATE", template, current_db.get("istemplate")),
+            ("ENCODING", encoding, current_db.get("encoding")),
+            ("LC_COLLATE", lc_collate, None),
+            ("LC_CTYPE", lc_ctype, None),
+        ):
+            if value and (current_value is None or current_value != value):
+                host.noop(
+                    "postgresql database {0} already exists, skipping {1}".format(database, key)
+                )
+
+        sql_bits = []
+
+        if owner and "owner" in current_db and current_db["owner"] != owner:
+            sql_bits.append('ALTER DATABASE "{0}" OWNER TO "{1}";'.format(database, owner))
+
+        if tablespace and "tablespace" in current_db and current_db["tablespace"] != tablespace:
+            sql_bits.append(
+                'ALTER DATABASE "{0}" SET TABLESPACE "{1}";'.format(database, tablespace)
+            )
+
+        if (
+            connection_limit
+            and "connlimit" in current_db
+            and current_db["connlimit"] != connection_limit
+        ):
+            sql_bits.append(
+                'ALTER DATABASE "{0}" CONNECTION LIMIT {1};'.format(database, connection_limit)
+            )
+
+        if len(sql_bits) > 0:
+            yield make_execute_psql_command(
+                StringCommand(*sql_bits),
+                user=psql_user,
+                password=psql_password,
+                host=psql_host,
+                port=psql_port,
+                database=psql_database,
+            )
+        else:
+            host.noop(
+                "postgresql database {0} already exists with the same parameters".format(database)
+            )
 
 
 @operation(is_idempotent=False)
 def dump(
     dest: str,
-    database: str | None = None,
     # Details for speaking to PostgreSQL via `psql` CLI
     psql_user: str | None = None,
     psql_password: str | None = None,
     psql_host: str | None = None,
     psql_port: int | None = None,
+    psql_database: str | None = None,
 ):
     """
     Dump a PostgreSQL database into a ``.sql`` file. Requires ``pg_dump``.
 
     + dest: name of the file to dump the SQL to
-    + database: name of the database to dump
     + psql_*: global module arguments, see above
 
     **Example:**
@@ -286,7 +376,6 @@ def dump(
         postgresql.dump(
             name="Dump the pyinfra_stuff database",
             dest="/tmp/pyinfra_stuff.dump",
-            database="pyinfra_stuff",
             sudo_user="postgres",
         )
 
@@ -295,32 +384,31 @@ def dump(
     yield StringCommand(
         make_psql_command(
             executable="pg_dump",
-            database=database,
             user=psql_user,
             password=psql_password,
             host=psql_host,
             port=psql_port,
+            database=psql_database,
         ),
         ">",
-        dest,
+        QuoteString(dest),
     )
 
 
 @operation(is_idempotent=False)
 def load(
     src: str,
-    database: str | None = None,
     # Details for speaking to PostgreSQL via `psql` CLI
     psql_user: str | None = None,
     psql_password: str | None = None,
     psql_host: str | None = None,
     psql_port: int | None = None,
+    psql_database: str | None = None,
 ):
     """
     Load ``.sql`` file into a database.
 
     + src: the filename to read from
-    + database: name of the database to import into
     + psql_*: global module arguments, see above
 
     **Example:**
@@ -330,7 +418,6 @@ def load(
         postgresql.load(
             name="Import the pyinfra_stuff dump into pyinfra_stuff_copy",
             src="/tmp/pyinfra_stuff.dump",
-            database="pyinfra_stuff_copy",
             sudo_user="postgres",
         )
 
@@ -338,12 +425,12 @@ def load(
 
     yield StringCommand(
         make_psql_command(
-            database=database,
             user=psql_user,
             password=psql_password,
             host=psql_host,
             port=psql_port,
+            database=psql_database,
         ),
         "<",
-        src,
+        QuoteString(src),
     )

@@ -41,20 +41,16 @@ Deploy Reference
 ----------------
 
 .. compound::
-    :doc:`examples`
-        A set of documented example deploys that focus on common patterns and use-cases.
-
-.. compound::
-    :doc:`connectors`
-        A list of connectors to target different hosts such as ``@docker``, ``@local`` and ``@terraform``.
-
-.. compound::
     :doc:`operations`
         A list of all available operations and their arguments, e.g. ``apt.packages``.
 
 .. compound::
     :doc:`facts`
         A list of all facts pyinfra can gather from hosts, e.g. ``server.Hostname``.
+
+.. compound::
+    :doc:`connectors`
+        A list of connectors to target different hosts such as ``@docker``, ``@local`` and ``@terraform``.
 
 
 How pyinfra Works
@@ -74,7 +70,11 @@ How pyinfra Works
 
 .. compound::
     :doc:`api/operations`
-        How to write your own facts & operations for pyinfra.
+        How to write your own operations for pyinfra.
+
+.. compound::
+    :doc:`api/facts`
+        How to write your own facts for pyinfra.
 
 .. compound::
     :doc:`api/index`
@@ -97,10 +97,9 @@ How pyinfra Works
     :maxdepth: 1
     :caption: Deploy Reference
 
-    examples
-    connectors
     operations
     facts
+    connectors
 
 .. toctree::
     :hidden:
@@ -108,8 +107,9 @@ How pyinfra Works
 
     deploy-process
     api/deploys
-    api/connectors
     api/operations
+    api/facts
+    api/connectors
     api/index
 
 .. toctree::

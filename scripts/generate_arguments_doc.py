@@ -29,10 +29,17 @@ def build_arguments_doc():
 
     all_arguments = get_type_hints(AllArguments)
 
-    for group_name, (arguments_meta, arguments_example_doc) in __argument_docs__.items():
+    for group_name, (
+        arguments_meta,
+        arguments_title_doc,
+        arguments_example_doc,
+    ) in __argument_docs__.items():
         lines.append("\n{0}".format(group_name))
         lines.append(title_line("~", group_name))
         lines.append("")
+
+        if arguments_title_doc:
+            lines.append(cleandoc(arguments_title_doc))
 
         lines.append(
             """.. list-table::

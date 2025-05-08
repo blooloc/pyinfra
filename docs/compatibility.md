@@ -39,11 +39,35 @@ pyinfra aims to be compatible with all Unix-like operating systems and is curren
     * HardenedBSD 11
     * DragonflyBSD 5
 + OpenSUSE (leap15 + tumbleweed)
-+ macOS 10.15 (with [`@local` connector](connectors.html#local))
-+ Docker (with [`@docker` connector](connectors.html#docker))
++ macOS 10.15 (with [`@local` connector](./connectors/local))
++ Docker (with [`@docker` connector](./connectors/docker))
 
 In general, the only requirement on the remote side is shell access. POSIX commands are used where possible for facts and operations, so most of the ``server`` and ``files`` operations should work anywhere POSIX.
 
+
+## Upgrading pyinfra from ``2.x`` -> ``3.x``
+
+- Rename `_use_sudo_password` argument to `_sudo_password`
+- Deploy decorator must be called:
+
+```py
+# Old, 2.x decorator
+@deploy
+def mydeploy():
+    ...
+
+# New, 3.x decorator
+@deploy()
+def mydeploy():
+    ...
+```
+
+- Remove `@winrm` connector, will come back as [`pyinfra-windows`](https://github.com/pyinfra-dev/pyinfra-windows)
+
+## Upgrading pyinfra from ``1.x`` -> ``2.x``
+
+- Python 2.7 (finally!), 3.5 support dropped, Python 3.6 is now the minimum required version
+- The "deploy directory" concept has been removed - everything now executes from the current working directory which removes the ambiguous magic v1 used to pick a deploy directory. A new --chdir CLI flag has been added to set the working directory before pyinfra executes
 
 ## Upgrading pyinfra from ``0.x`` -> ``1.x``
 

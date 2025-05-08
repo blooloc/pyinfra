@@ -137,7 +137,7 @@ shell_argument_meta: dict[str, ArgumentMeta] = {
     ),
     "_chdir": ArgumentMeta(
         "Directory to switch to before executing the command.",
-        default=lambda _: "",
+        default=lambda _: None,
     ),
     "_env": ArgumentMeta(
         "Dictionary of environment variables to set.",
@@ -248,6 +248,12 @@ __argument_docs__ = {
     "Privilege & user escalation": (
         auth_argument_meta,
         """
+        .. caution::
+            When combining privilege escalation arguments it is important to know the order they
+            are applied: ``doas`` -> ``sudo`` -> ``su``. For example
+            ``_sudo=True,_su_user="pyinfra"`` yields a command like ``sudo su pyinfra..``.
+        """,
+        """
         .. code:: python
 
             # Execute a command with sudo
@@ -268,6 +274,7 @@ __argument_docs__ = {
     ),
     "Shell control & features": (
         shell_argument_meta,
+        "",
         """
         .. code:: python
 
@@ -279,8 +286,8 @@ __argument_docs__ = {
             )
         """,
     ),
-    "Operation meta & callbacks": (meta_argument_meta, ""),
-    "Execution strategy": (execution_argument_meta, ""),
+    "Operation meta & callbacks": (meta_argument_meta, "", ""),
+    "Execution strategy": (execution_argument_meta, "", ""),
 }
 
 

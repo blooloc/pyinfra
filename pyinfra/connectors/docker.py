@@ -6,7 +6,7 @@ from tempfile import mkstemp
 from typing import TYPE_CHECKING
 
 import click
-from typing_extensions import TypedDict, Unpack
+from typing_extensions import TypedDict, Unpack, override
 
 from pyinfra import local, logger
 from pyinfra.api import QuoteString, StringCommand
@@ -58,13 +58,20 @@ def _start_docker_image(image_name):
 
 class DockerConnector(BaseConnector):
     """
-    The docker connector allows you to build Docker images or modify running
-    Docker containers. You can pass either an image name or existing container ID:
+    The Docker connector allows you to use pyinfra to create new Docker images or modify running
+    Docker containers.
 
-    + Image - will create a new container from the image, execute operations \
-        against it, save into a new Docker image and remove the container
-    + Existing container ID - will execute operations against the running \
-        container, leaving it running
+    .. note::
+
+        The Docker connector allows pyinfra to target Docker containers as inventory and is
+        unrelated to the :doc:`../operations/docker` & :doc:`../facts/docker`.
+
+    You can pass either an image name or existing container ID:
+
+    + Image - will create a new container from the image, execute operations against it, save into \
+        a new Docker image and remove the container
+    + Existing container ID - will execute operations against the running container, leaving it \
+        running
 
     .. code:: shell
 
@@ -76,6 +83,10 @@ class DockerConnector(BaseConnector):
 
         # Execute against a running container
         pyinfra @docker/2beb8c15a1b1 ...
+
+    The Docker connector is great for testing pyinfra operations locally, rather than connecting to
+    a remote host over SSH each time. This gives you a fast, local-first devloop to iterate on when
+    writing deploys, operations or facts.
     """
 
     handles_execution = True
@@ -104,6 +115,7 @@ class DockerConnector(BaseConnector):
             ["@docker"],
         )
 
+    @override
     def connect(self) -> None:
         self.local.connect()
 
@@ -116,7 +128,8 @@ class DockerConnector(BaseConnector):
             except PyinfraError:
                 self.container_id = _start_docker_image(docker_identifier)
 
-    def disconnect(self):
+    @override
+    def disconnect(self) -> None:
         container_id = self.container_id
 
         if self.no_stop:
@@ -145,6 +158,7 @@ class DockerConnector(BaseConnector):
             ),
         )
 
+    @override
     def run_shell_command(
         self,
         command: StringCommand,
@@ -177,6 +191,7 @@ class DockerConnector(BaseConnector):
             **local_arguments,
         )
 
+    @override
     def put_file(
         self,
         filename_or_io,
@@ -234,6 +249,7 @@ class DockerConnector(BaseConnector):
 
         return status
 
+    @override
     def get_file(
         self,
         remote_filename,

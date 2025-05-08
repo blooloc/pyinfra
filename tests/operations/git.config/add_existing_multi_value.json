@@ -5,8 +5,11 @@
     },
     "facts": {
         "git.GitConfig": {
-            "key": ["value"]
+            "repo=None, system=False": {
+                "key": ["value"]
+            }
         }
     },
-    "commands": []
+    "commands": [],
+    "noop_description": "git config key is set to value"
 }

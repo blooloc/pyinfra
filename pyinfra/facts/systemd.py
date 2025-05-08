@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Dict, Iterable
 
+from typing_extensions import override
+
 from pyinfra.api import FactBase, QuoteString, StringCommand
 
 # Valid unit names consist of a "name prefix" and a dot and a suffix specifying the unit type.
@@ -32,6 +34,9 @@ def _make_systemctl_cmd(user_mode=False, machine=None, user_name=None):
             systemctl_cmd.append("--machine={1}@{0}".format(machine, user_name))
         else:
             systemctl_cmd.append("--machine={0}".format(machine))
+    elif user_name is not None:
+        # If only the user is given, assume that the connection should be made to the local machine
+        systemctl_cmd.append("--machine={0}@.host".format(user_name))
 
     return StringCommand(*systemctl_cmd)
 
@@ -52,14 +57,16 @@ class SystemdStatus(FactBase[Dict[str, bool]]):
         }
     """
 
+    @override
     def requires_command(self, *args, **kwargs) -> str:
         return "systemctl"
 
     default = dict
 
     state_key = "SubState"
-    state_values = ["running", "waiting", "exited"]
+    state_values = ["running", "waiting", "exited", "listening"]
 
+    @override
     def command(
         self,
         user_mode: bool = False,
@@ -91,6 +98,7 @@ class SystemdStatus(FactBase[Dict[str, bool]]):
             *service_strs,
         )
 
+    @override
     def process(self, output) -> Dict[str, bool]:
         services: Dict[str, bool] = {}
 

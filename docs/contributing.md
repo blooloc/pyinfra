@@ -2,7 +2,7 @@
 
 🎉 Thank you for taking the time to contribute to pyinfra! 🎉
 
-Third party pull requests help expand pyinfra's functionality and are essential to it's continued growth. This guide should help get you started adding additional operations, facts and other functionality to pyinfra.
+Third party pull requests help expand pyinfra's functionality and are essential to its continued growth. This guide should help get you started adding additional operations, facts and other functionality to pyinfra.
 
 ## Guides
 
@@ -23,7 +23,7 @@ Third party pull requests help expand pyinfra's functionality and are essential 
 # python -m venv / pyenv virtualenv / virtualenv
 
 # Clone the repo
-git clone git@github.com:Fizzadar/pyinfra.git
+git clone git@github.com:pyinfra-dev/pyinfra.git
 
 # Install the package in editable mode with development requirements
 cd pyinfra
@@ -46,15 +46,24 @@ GitHub will run all the test suites as part of any pull requests. There's a hand
 scripts/dev-test.sh
 ```
 
-#### Unit Tests
+To limit the pytests to a specific fact or operation:
 
-Use `pytest` to run the unit tests, or `pytest --cov` to run with coverage. Pull requests are expected to be tested and not drop overall project coverage by >1%.
+```sh
+# Only run fact tests for facts.efibootmgr.EFIBootMGR
+pytest tests/test_facts.py -k "efibootmgr.EFIBootMGR"
+
+# Only run operation tests for operations.selinux
+pytest tests/test_operations.py -k "selinux."
+```
 
 #### End to End Tests
 
 The end to end tests are also executed via `pytest` but not selected by default, options/usage:
 
 ```sh
+# Run all the e2e tests (local, SSH, Docker)
+scripts/dev-test-e2e.sh
+
 # Run local e2e tests (works on Linux / MacOS, no Windows yet)
 pytest -m end_to_end_local
 
@@ -63,16 +72,21 @@ pytest -m end_to_end_ssh
 pytest -m end_to_end_docker
 ```
 
-## Generate Documentation
+## Documentation
+
+Documentation changes should be made in the [https://github.com/pyinfra-dev/pyinfa](pyinfra git repository) - the repository `docs.pyinfra.com` should
+not be changed, it contains build artifacts.
+
+### Generate Documentation
 
 To generate:
 
 ```sh
-sphinx-build -a docs/ docs/build/
+scripts/build-public-docs.sh
 ```
 
 To view ([localhost:8000](http://localhost:8000)):
 
 ```sh
-python -m http.server -d docs/build/
+python -m http.server -d docs/public/en/latest/
 ```

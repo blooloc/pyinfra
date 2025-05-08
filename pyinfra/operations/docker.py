@@ -1,12 +1,14 @@
 """
-Manager Docker Containers, Volumes and Networks
+Manager Docker containers, volumes and networks. These operations allow you to manage Docker from
+the view of the current inventory host. See the :doc:`../connectors/docker` to use Docker containers
+as inventory directly.
 """
 
 from pyinfra import host
 from pyinfra.api import operation
-from pyinfra.facts.docker import DockerContainers, DockerNetworks, DockerVolumes
+from pyinfra.facts.docker import DockerContainer, DockerNetwork, DockerVolume
 
-from .util.docker import handle_docker
+from .util.docker import ContainerSpec, handle_docker
 
 
 @operation()
@@ -30,9 +32,9 @@ def container(
     + networks: network list to attach on container
     + ports: port list to expose
     + volumes: volume list to map on container
-    + env_vars: environment varible list to inject on container
+    + env_vars: environment variable list to inject on container
     + pull_always: force image pull
-    + force: remove a contaner with same name and create a new one
+    + force: remove a container with same name and create a new one
     + present: whether the container should be up and running
     + start: start or stop the container
 
@@ -68,53 +70,57 @@ def container(
         )
     """
 
-    existent_container = [c for c in host.get_fact(DockerContainers) if container in c["Name"]]
+    want_spec = ContainerSpec(
+        image,
+        ports or list(),
+        networks or list(),
+        volumes or list(),
+        env_vars or list(),
+        pull_always,
+    )
+    existent_container = host.get_fact(DockerContainer, object_id=container)
 
-    if force:
-        if existent_container:
-            yield handle_docker(
-                resource="container",
-                command="remove",
-                container=container,
-            )
+    container_spec_changes = want_spec.diff_from_inspect(existent_container)
 
-    if present:
-        if not existent_container or force:
-            yield handle_docker(
-                resource="container",
-                command="create",
-                container=container,
-                image=image,
-                ports=ports,
-                networks=networks,
-                volumes=volumes,
-                env_vars=env_vars,
-                pull_always=pull_always,
-                present=present,
-                force=force,
-                start=start,
-            )
+    is_running = (
+        (existent_container[0]["State"]["Status"] == "running")
+        if existent_container and existent_container[0]
+        else False
+    )
+    recreating = existent_container and (force or container_spec_changes)
+    removing = existent_container and not present
 
-    if existent_container and start:
-        if existent_container[0]["State"]["Status"] != "running":
-            yield handle_docker(
-                resource="container",
-                command="start",
-                container=container,
-            )
+    do_remove = recreating or removing
+    do_create = (present and not existent_container) or recreating
+    do_start = start and (recreating or not is_running)
+    do_stop = not start and not removing and is_running
 
-    if existent_container and not start:
-        if existent_container[0]["State"]["Status"] == "running":
-            yield handle_docker(
-                resource="container",
-                command="stop",
-                container=container,
-            )
-
-    if existent_container and not present:
+    if do_remove:
         yield handle_docker(
             resource="container",
             command="remove",
+            container=container,
+        )
+
+    if do_create:
+        yield handle_docker(
+            resource="container",
+            command="create",
+            container=container,
+            spec=want_spec,
+        )
+
+    if do_start:
+        yield handle_docker(
+            resource="container",
+            command="start",
+            container=container,
+        )
+
+    if do_stop:
+        yield handle_docker(
+            resource="container",
+            command="stop",
             container=container,
         )
 
@@ -125,7 +131,7 @@ def image(image, present=True):
     Manage Docker images
 
     + image: Image and tag ex: nginx:alpine
-    + present: whether the Docker image should be exist
+    + present: whether the Docker image should exist
 
     **Examples:**
 
@@ -183,12 +189,12 @@ def volume(volume, driver="", labels=None, present=True):
         )
     """
 
-    existent_volume = [v for v in host.get_fact(DockerVolumes) if v["Name"] == volume]
+    existent_volume = host.get_fact(DockerVolume, object_id=volume)
 
     if present:
 
         if existent_volume:
-            host.noop("Volume alredy exist!")
+            host.noop("Volume already exists!")
             return
 
         yield handle_docker(
@@ -231,8 +237,8 @@ def network(
     """
     Manage docker networks
 
-    + network_name: Image name
-    + driver: Container image and tag ex: nginx:alpine
+    + network: Network name
+    + driver: Network driver ex: bridge or overlay
     + gateway: IPv4 or IPv6 Gateway for the master subnet
     + ip_range: Allocate container ip from a sub-range
     + ipam_driver: IP Address Management Driver
@@ -251,17 +257,16 @@ def network(
 
         # Create Docker network
         docker.network(
-            name="Create nginx network",
-            network_name="nginx",
+            network="nginx",
             attachable=True,
             present=True,
         )
     """
-    existent_network = [n for n in host.get_fact(DockerNetworks) if n["Name"] == network]
+    existent_network = host.get_fact(DockerNetwork, object_id=network)
 
     if present:
         if existent_network:
-            host.noop("Alredy exist a network with {0} name!".format(network))
+            host.noop("Network {0} already exists!".format(network))
             return
 
         yield handle_docker(
@@ -284,12 +289,12 @@ def network(
 
     else:
         if existent_network is None:
-            host.noop("Ther is not network with {0} name!".format(network))
+            host.noop("Network {0} does not exist!".format(network))
             return
 
         yield handle_docker(
             resource="network",
-            command="create",
+            command="remove",
             network=network,
         )
 
@@ -297,7 +302,7 @@ def network(
 @operation(is_idempotent=False)
 def prune(
     all=False,
-    volume=False,
+    volumes=False,
     filter="",
 ):
     """
@@ -334,6 +339,6 @@ def prune(
         resource="system",
         command="prune",
         all=all,
-        volume=volume,
+        volumes=volumes,
         filter=filter,
     )

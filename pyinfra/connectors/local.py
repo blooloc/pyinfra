@@ -4,7 +4,7 @@ from tempfile import mkstemp
 from typing import TYPE_CHECKING, Tuple
 
 import click
-from typing_extensions import Unpack
+from typing_extensions import Unpack, override
 
 from pyinfra import logger
 from pyinfra.api.command import QuoteString, StringCommand
@@ -45,6 +45,7 @@ class LocalConnector(BaseConnector):
 
         yield "@local", {}, ["@local"]
 
+    @override
     def run_shell_command(
         self,
         command: StringCommand,
@@ -101,6 +102,7 @@ class LocalConnector(BaseConnector):
 
         return status, combined_output
 
+    @override
     def put_file(
         self,
         filename_or_io,
@@ -152,6 +154,7 @@ class LocalConnector(BaseConnector):
 
         return status
 
+    @override
     def get_file(
         self,
         remote_filename,
@@ -184,7 +187,7 @@ class LocalConnector(BaseConnector):
                 raise IOError(output.stderr)
 
             # Load our file or IO object and write it to the temporary file
-            with open(temp_filename, encoding="utf-8") as temp_f:
+            with open(temp_filename, "rb") as temp_f:
                 with get_file_io(filename_or_io, "wb") as file_io:
                     data_bytes: bytes
 
@@ -206,10 +209,12 @@ class LocalConnector(BaseConnector):
 
         return True
 
-    def check_can_rsync(self):
+    @override
+    def check_can_rsync(self) -> None:
         if not which("rsync"):
             raise NotImplementedError("The `rsync` binary is not available on this system.")
 
+    @override
     def rsync(
         self,
         src,

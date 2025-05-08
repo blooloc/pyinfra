@@ -6,9 +6,9 @@ from string import Formatter
 from typing import IO, TYPE_CHECKING, Callable, Union
 
 import gevent
-from typing_extensions import Unpack
+from typing_extensions import Unpack, override
 
-from pyinfra.context import ctx_config, ctx_host
+from pyinfra.context import LocalContextObject, ctx_config, ctx_host
 
 from .arguments import ConnectorArguments
 
@@ -58,6 +58,7 @@ class QuoteString:
     def __init__(self, obj: Union[str, "StringCommand"]):
         self.obj = obj
 
+    @override
     def __repr__(self) -> str:
         return f"QuoteString({self.obj})"
 
@@ -68,6 +69,7 @@ class PyinfraCommand:
     def __init__(self, **arguments: Unpack[ConnectorArguments]):
         self.connector_arguments = arguments
 
+    @override
     def __eq__(self, other) -> bool:
         if isinstance(other, self.__class__) and repr(self) == repr(other):
             return True
@@ -88,9 +90,11 @@ class StringCommand(PyinfraCommand):
         self.bits = bits
         self.separator = _separator
 
+    @override
     def __str__(self) -> str:
         return self.get_masked_value()
 
+    @override
     def __repr__(self) -> str:
         return f"StringCommand({self.get_masked_value()})"
 
@@ -131,6 +135,7 @@ class StringCommand(PyinfraCommand):
             ],
         )
 
+    @override
     def execute(self, state: "State", host: "Host", connector_arguments: ConnectorArguments):
         connector_arguments.update(self.connector_arguments)
 
@@ -155,9 +160,11 @@ class FileUploadCommand(PyinfraCommand):
         self.dest = dest
         self.remote_temp_filename = remote_temp_filename
 
+    @override
     def __repr__(self):
         return "FileUploadCommand({0}, {1})".format(self.src, self.dest)
 
+    @override
     def execute(self, state: "State", host: "Host", connector_arguments: ConnectorArguments):
         connector_arguments.update(self.connector_arguments)
 
@@ -184,9 +191,11 @@ class FileDownloadCommand(PyinfraCommand):
         self.dest = dest
         self.remote_temp_filename = remote_temp_filename
 
+    @override
     def __repr__(self):
         return "FileDownloadCommand({0}, {1})".format(self.src, self.dest)
 
+    @override
     def execute(self, state: "State", host: "Host", connector_arguments: ConnectorArguments):
         connector_arguments.update(self.connector_arguments)
 
@@ -213,6 +222,7 @@ class FunctionCommand(PyinfraCommand):
         self.args = args
         self.kwargs = func_kwargs
 
+    @override
     def __repr__(self):
         return "FunctionCommand({0}, {1}, {2})".format(
             self.function.__name__,
@@ -220,12 +230,19 @@ class FunctionCommand(PyinfraCommand):
             self.kwargs,
         )
 
+    @override
     def execute(self, state: "State", host: "Host", connector_arguments: ConnectorArguments):
         argspec = getfullargspec(self.function)
         if "state" in argspec.args and "host" in argspec.args:
             return self.function(state, host, *self.args, **self.kwargs)
 
-        def execute_function():
+        # If we're already running inside a greenlet (ie a nested callback) just execute the func
+        # without any gevent.spawn which will break the local host object.
+        if isinstance(host, LocalContextObject):
+            self.function(*self.args, **self.kwargs)
+            return
+
+        def execute_function() -> None:
             with ctx_config.use(state.config.copy()):
                 with ctx_host.use(host):
                     self.function(*self.args, **self.kwargs)
@@ -241,9 +258,11 @@ class RsyncCommand(PyinfraCommand):
         self.dest = dest
         self.flags = flags
 
+    @override
     def __repr__(self):
         return "RsyncCommand({0}, {1}, {2})".format(self.src, self.dest, self.flags)
 
+    @override
     def execute(self, state: "State", host: "Host", connector_arguments: ConnectorArguments):
         return host.rsync(
             self.src,

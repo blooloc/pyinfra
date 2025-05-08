@@ -11,23 +11,24 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    if: github.repository == 'pyinfra-dev/pyinfra'
     steps:
       - name: Clone Source Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Fetch git tags
         run: git fetch --tags origin
 
       - name: Clone Generated Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           repository: fizzadar/docs.pyinfra.com
           path: docs/public/
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
 
       - name: Install
         run: |
@@ -35,7 +36,7 @@ jobs:
           pip install 'jinja2<3.1'
 
       - name: Generate documentation
-        run: scripts/build_public_docs.sh
+        run: scripts/build-public-docs.sh
         env:
           PYTHONPATH: '.'
 

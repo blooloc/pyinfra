@@ -51,6 +51,7 @@ from pyinfra.facts.files import (
     Md5File,
     Sha1File,
     Sha256File,
+    Sha384File,
 )
 from pyinfra.facts.server import Date, Which
 
@@ -67,6 +68,7 @@ def download(
     mode: str | None = None,
     cache_time: int | None = None,
     force=False,
+    sha384sum: str | None = None,
     sha256sum: str | None = None,
     sha1sum: str | None = None,
     md5sum: str | None = None,
@@ -84,6 +86,7 @@ def download(
     + mode: permissions of the files
     + cache_time: if the file exists already, re-download after this time (in seconds)
     + force: always download the file, even if it already exists
+    + sha384sum: sha384 hash to checksum the downloaded file against
     + sha256sum: sha256 hash to checksum the downloaded file against
     + sha1sum: sha1 hash to checksum the downloaded file against
     + md5sum: md5 hash to checksum the downloaded file against
@@ -133,6 +136,10 @@ def download(
 
         if sha256sum:
             if sha256sum != host.get_fact(Sha256File, path=dest):
+                download = True
+
+        if sha384sum:
+            if sha384sum != host.get_fact(Sha384File, path=dest):
                 download = True
 
         if md5sum:
@@ -211,6 +218,17 @@ def download(
                 QuoteString("SHA256 did not match!"),
             )
 
+        if sha384sum:
+            yield make_formatted_string_command(
+                (
+                    "(( sha384sum {0} 2> /dev/null || shasum -a 384 {0} ) "
+                    "| grep {1}) || ( echo {2} && exit 1 )"
+                ),
+                QuoteString(dest),
+                sha384sum,
+                QuoteString("SHA384 did not match!"),
+            )
+
         if md5sum:
             yield make_formatted_string_command(
                 (
@@ -256,7 +274,7 @@ def line(
         change bits of lines, see ``files.replace``.
 
     Regex line escaping:
-        If matching special characters (eg a crontab line containing *), remember to escape
+        If matching special characters (eg a crontab line containing ``*``), remember to escape
         it first using Python's ``re.escape``.
 
     Backup:
@@ -523,7 +541,7 @@ def sync(
     + mode: permissions of the files
     + dir_mode: permissions of the directories
     + delete: delete remote files not present locally
-    + exclude: string or list/tuple of strings to match & exclude files (eg *.pyc)
+    + exclude: string or list/tuple of strings to match & exclude files (eg ``*.pyc``)
     + exclude_dir: string or list/tuple of strings to match & exclude directories (eg node_modules)
     + add_deploy_dir: interpret src as relative to deploy directory instead of current directory
 
@@ -647,7 +665,7 @@ def sync(
 
 
 @memoize
-def show_rsync_warning():
+def show_rsync_warning() -> None:
     logger.warning("The `files.rsync` operation is in alpha!")
 
 
@@ -915,7 +933,8 @@ def template(
     user: str | None = None,
     group: str | None = None,
     mode: str | None = None,
-    create_remote_dir=True,
+    create_remote_dir: bool = True,
+    jinja_env_kwargs: dict[str, Any] | None = None,
     **data,
 ):
     '''
@@ -927,11 +946,20 @@ def template(
     + group: group to own the files
     + mode: permissions of the files
     + create_remote_dir: create the remote directory if it doesn't exist
+    + jinja_env_kwargs: keyword arguments to be passed into the jinja Environment()
 
     ``create_remote_dir``:
         If the remote directory does not exist it will be created using the same
         user & group as passed to ``files.put``. The mode will *not* be copied over,
         if this is required call ``files.directory`` separately.
+
+    ``jinja_env_kwargs``:
+        To have more control over how jinja2 renders your template, you can pass
+        a dict with arguments that will be passed as keyword args to the jinja2
+        `Environment() <https://jinja.palletsprojects.com/en/3.0.x/api/#jinja2.Environment>`_.
+
+    The ``host``, ``state``, and ``inventory`` objects will be automatically passed to the template
+    if not set explicitly.
 
     Notes:
        Common convention is to store templates in a "templates" directory and
@@ -990,6 +1018,21 @@ def template(
             foo_dict=foo_dict,
             foo_list=foo_list
         )
+
+        # Example showing how to use host and inventory in a template file.
+        template = StringIO("""
+        name: "{{ host.name }}"
+        list_contents:
+        {% for entry in inventory.groups.my_servers %}
+            - "{{ entry }}"
+        {% endfor %}
+        """)
+
+        files.template(
+            name="Create a templated file",
+            src=template,
+            dest="/tmp/foo.yml"
+        )
     '''
 
     if not hasattr(src, "read") and state.cwd:
@@ -1002,7 +1045,7 @@ def template(
 
     # Render and make file-like it's output
     try:
-        output = get_template(src).render(data)
+        output = get_template(src, jinja_env_kwargs).render(data)
     except (TemplateRuntimeError, TemplateSyntaxError, UndefinedError) as e:
         trace_frames = [
             frame
@@ -1042,6 +1085,34 @@ def template(
         add_deploy_dir=False,
         create_remote_dir=create_remote_dir,
     )
+
+
+@operation()
+def move(src: str, dest: str, overwrite=False):
+    """
+    Move remote file/directory/link into remote directory
+
+    + src: remote file/directory to move
+    + dest: remote directory to move `src` into
+    + overwrite: whether to overwrite dest, if present
+    """
+
+    if host.get_fact(File, src) is None:
+        raise OperationError("src {0} does not exist".format(src))
+
+    if not host.get_fact(Directory, dest):
+        raise OperationError("dest {0} is not an existing directory".format(dest))
+
+    full_dest_path = os.path.join(dest, os.path.basename(src))
+    if host.get_fact(File, full_dest_path) is not None:
+        if overwrite:
+            yield StringCommand("rm", "-rf", QuoteString(full_dest_path))
+        else:
+            raise OperationError(
+                "dest {0} already exists and `overwrite` is unset".format(full_dest_path)
+            )
+
+    yield StringCommand("mv", QuoteString(src), QuoteString(dest))
 
 
 def _validate_path(path):

@@ -6,13 +6,13 @@
     },
     "facts": {
         "postgres.PostgresRoles": {
-            "psql_host=None, psql_password=None, psql_port=None, psql_user=None": {}
+            "psql_database=None, psql_host=None, psql_password=None, psql_port=None, psql_user=None": {}
         }
     },
     "commands": [
-        [
-            "psql -Ac 'CREATE ROLE \"testuser\" LOGIN CONNECTION LIMIT 15 PASSWORD '\"'\"'abc'\"'\"''",
-            "psql -Ac 'CREATE ROLE \"testuser\" LOGIN CONNECTION LIMIT 15 ***'"
-        ]
+        {
+            "raw": "psql -Ac 'CREATE ROLE \"testuser\" LOGIN CONNECTION LIMIT 15 PASSWORD '\"'\"'abc'\"'\"''",
+            "masked":"psql -Ac 'CREATE ROLE \"testuser\" LOGIN CONNECTION LIMIT 15 ***'"
+        }
     ]
 }

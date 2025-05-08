@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from copy import copy
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -16,7 +17,7 @@ from typing import (
 from uuid import uuid4
 
 import click
-from typing_extensions import Unpack
+from typing_extensions import Unpack, override
 
 from pyinfra import logger
 from pyinfra.connectors.base import BaseConnector
@@ -41,7 +42,6 @@ def extract_callable_datas(
         # the data is stored on the state temporarily.
         if callable(data):
             data = data()
-
         yield data
 
 
@@ -66,15 +66,20 @@ class HostData:
     def __getattr__(self, key: str):
         for data in extract_callable_datas(self.datas):
             try:
-                return data[key]
+                # Take a shallow copy of the object here, we don't want modifications
+                # to host.data.<X> to stick, instead setting host.data.<Y> = is the
+                # correct way to achieve this (see __setattr__).
+                return copy(data[key])
             except KeyError:
                 pass
 
         raise AttributeError(f"Host `{self.host}` has no data `{key}`")
 
+    @override
     def __setattr__(self, key: str, value: Any):
         self.override_datas[key] = value
 
+    @override
     def __str__(self):
         return str(self.datas)
 
@@ -144,8 +149,10 @@ class Host:
         name: str,
         inventory: "Inventory",
         groups,
-        connector_cls=get_execution_connector("ssh"),
+        connector_cls=None,
     ):
+        if connector_cls is None:
+            connector_cls = get_execution_connector("ssh")
         self.inventory = inventory
         self.groups = groups
         self.connector_cls = connector_cls
@@ -178,9 +185,11 @@ class Host:
         padding_diff = longest_name_len - len(self.name)
         self.print_prefix_padding = "".join(" " for _ in range(0, padding_diff))
 
+    @override
     def __str__(self):
         return "{0}".format(self.name)
 
+    @override
     def __repr__(self):
         return "Host({0})".format(self.name)
 
@@ -215,17 +224,19 @@ class Host:
             self.print_prefix_padding,
         )
 
-    def log(self, message, log_func=logger.info):
+    def log(self, message: str, log_func: Callable[[str], Any] = logger.info) -> None:
         log_func(f"{self.print_prefix}{message}")
 
-    def log_styled(self, message, log_func=logger.info, **kwargs):
+    def log_styled(
+        self, message: str, log_func: Callable[[str], Any] = logger.info, **kwargs
+    ) -> None:
         message_styled = click.style(message, **kwargs)
         self.log(message_styled, log_func=log_func)
 
     def get_deploy_data(self):
         return self.current_op_deploy_data or self.current_deploy_data or {}
 
-    def noop(self, description):
+    def noop(self, description: str) -> None:
         """
         Log a description for a noop operation.
         """
@@ -352,7 +363,7 @@ class Host:
     # Connector proxy
     #
 
-    def _check_state(self):
+    def _check_state(self) -> None:
         if not self.state:
             raise TypeError("Cannot call this function with no state!")
 
@@ -394,7 +405,7 @@ class Host:
                 self.state.trigger_callbacks("host_connect", self)
                 self.connected = True
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """
         Disconnect from the host using it's configured connector.
         """
@@ -403,12 +414,13 @@ class Host:
         # Disconnect is an optional function for connectors if needed
         disconnect_func = getattr(self.connector, "disconnect", None)
         if disconnect_func:
-            return disconnect_func()
+            disconnect_func()
 
         # TODO: consider whether this should be here!
         remove_any_sudo_askpass_file(self)
 
         self.state.trigger_callbacks("host_disconnect", self)
+        self.connected = False
 
     def run_shell_command(self, *args, **kwargs) -> tuple[bool, CommandOutput]:
         """
