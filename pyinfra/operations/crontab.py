@@ -121,7 +121,6 @@ def crontab(
 
     # Want the cron but it doesn't exist? Append the line
     elif present and not exists:
-        print("present", present, "exists", exists)
         if ctb:  # append a blank line if cron entries already exist
             edit_commands.append("echo '' >> {0}".format(temp_filename))
         if cron_name:
